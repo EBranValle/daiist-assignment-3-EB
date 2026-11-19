@@ -35,10 +35,26 @@ MANIFEST = INDEX_DIR / "manifest.json"
 # Configuration. The corpus and the design choice are yours to fill in.
 # ---------------------------------------------------------------------------
 
-# TODO: your documents (3+, 50,000+ words in total, public, licence noted).
-# `name` becomes the chunk's `source`; keep it short, it appears in citations.
+# The corpus. EUR-Lex serves its PDFs behind a bot challenge that scripts
+# cannot pass, so the files are committed in corpus/ and `url` is the citation
+# for the report; download_corpus() only fetches files that are missing.
+# Licence: EU legal acts on EUR-Lex may be reused with acknowledgement of the
+# source (Commission Decision 2011/833/EU).
+LICENCE = "EUR-Lex, reuse authorised (Decision 2011/833/EU)"
 SOURCES: list[dict] = [
-    # {"name": "EU-AI-Act", "url": "https://eur-lex.europa.eu/...pdf", "licence": "CC BY 4.0"},
+    {"name": "MiFIR", "filename": "CELEX_32014R0600_EN_TXT.pdf", "licence": LICENCE,
+     "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014R0600",
+     "title": "Regulation (EU) No 600/2014 on markets in financial instruments (MiFIR)"},
+    {"name": "MiFID2-Delegated", "filename": "CELEX_32017R0565_EN_TXT.pdf", "licence": LICENCE,
+     "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32017R0565",
+     "title": "Commission Delegated Regulation (EU) 2017/565 supplementing MiFID II"},
+]
+# Held back from the index: added later with the add_document tool to show an
+# unanswerable question becoming answerable. Lives in reserve/, not corpus/.
+RESERVE: list[dict] = [
+    {"name": "PRIIPs", "filename": "CELEX_32014R1286_EN_TXT.pdf", "licence": LICENCE,
+     "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014R1286",
+     "title": "Regulation (EU) No 1286/2014 on key information documents for PRIIPs"},
 ]
 SUPPORTED = {".pdf", ".html", ".htm", ".txt", ".md"}
 
@@ -59,13 +75,17 @@ DEFAULT_DESIGN = "words150"   # TODO: set to the winner from `main.py evaluate`
 DEFAULT_MODE = "vector"       # "vector" or "hybrid" (vector + BM25, no extra embeddings)
 DEFAULT_K = 5
 
-# Lines that start a new section in plain text extracted from PDFs. Adjust to
-# your documents (e.g. "Article 12", "3.2 Scope", "CHAPTER IV").
-HEADING_RE = re.compile(
-    r"^(?:(?:article|art\.|section|chapter|annex|part|title)\s+[0-9ivxlc]+[a-z]?\b.*"
-    r"|\d+(?:\.\d+){0,3}\.?\s+[A-Z][^.]{2,90})$",
-    re.IGNORECASE,
-)
+# Lines that start a new section in text extracted from PDFs. EU regulations:
+# "Article 12", "Article 12a", "ANNEX I". (Numbered paragraphs and cross-
+# references such as "Article 4(1) of Directive ..." must not match.)
+HEADING_RE = re.compile(r"^(?:Article \d+[a-z]?|ANNEX(?: [IVXLC]+)?)$")
+# In EU acts the line after "Article N" is the article's title.
+TITLE_AFTER_HEADING = True
+# Heading for text before the first article (citations, recitals).
+FRONT_MATTER = "Recitals"
+# Lines dropped wherever they appear, e.g. the Official Journal page header,
+# which pypdf sometimes places mid-page.
+NOISE_RE = re.compile(r"Official Journal of the European Union")
 
 
 def log(*args) -> None:
@@ -128,12 +148,22 @@ def _repeated_lines(pages: list[list[str]]) -> set[str]:
     return {line for line, n in counts.items() if n >= 0.3 * len(pages)}
 
 
+def _headings_have_titles(pages: list[list[str]]) -> bool:
+    """False when most headings are followed straight by a numbered paragraph ("1. ..."),
+    i.e. the document does not title its articles (as in the PRIIPs Regulation)."""
+    lines = [l.strip() for page in pages for l in page if l.strip()]
+    following = [lines[i + 1] for i in range(len(lines) - 1) if _is_heading(lines[i])]
+    numbered = sum(bool(re.match(r"^\d+\.\s", l)) for l in following)
+    return bool(following) and numbered < len(following) / 2
+
+
 def extract_pdf(path: Path) -> list[dict]:
     from pypdf import PdfReader
 
     pages = [clean_text(p.extract_text() or "").split("\n") for p in PdfReader(path).pages]
     repeated = _repeated_lines(pages)
-    blocks, heading = [], ""
+    blocks, heading, want_title, title_open = [], FRONT_MATTER, False, False
+    has_titles = TITLE_AFTER_HEADING and _headings_have_titles(pages)
     for number, lines in enumerate(pages, start=1):
         paragraph: list[str] = []
 
@@ -149,10 +179,22 @@ def extract_pdf(path: Path) -> list[dict]:
             edge = i < 3 or i >= len(lines) - 3
             if edge and not _is_heading(line) and re.sub(r"\d+", "#", line) in repeated:
                 continue
+            if NOISE_RE.search(line):
+                continue
             if _is_heading(line):
                 flush()
-                heading = line
+                heading, want_title, title_open = line, has_titles, False
                 continue
+            if want_title:
+                want_title = False
+                if len(line.split()) <= 20 and not line.endswith((".", ":", ";")) and not re.match(r"^(\d+\.|\()", line):
+                    heading, title_open = f"{heading} ({line})", True
+                    continue
+            if title_open:
+                title_open = False
+                if line[:1].islower() and len(line.split()) <= 20:    # title wrapped onto a second line
+                    heading = f"{heading[:-1]} {line})"
+                    continue
             paragraph.append(line)
             if line.endswith((".", ":", ";")) and len(" ".join(paragraph).split()) > 40:
                 flush()
@@ -287,7 +329,7 @@ def chunk_blocks(blocks: list[dict], source: str, design: str) -> list[dict]:
 
 
 def source_name(path: Path) -> str:
-    for source in SOURCES:
+    for source in SOURCES + RESERVE:
         if _filename(source) == path.name:
             return source["name"]
     return path.stem
