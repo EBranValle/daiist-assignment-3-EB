@@ -20,7 +20,9 @@ from __future__ import annotations
 import asyncio
 import csv
 import json
+import os
 import re
+import time
 import sys
 from pathlib import Path
 
@@ -33,7 +35,8 @@ QUESTIONS = EVAL / "questions.csv"
 HUMAN = EVAL / "human_labels.csv"
 ANSWERS = EVAL / "answers.jsonl"
 JUDGE = EVAL / "judge.jsonl"
-JUDGE_MODEL = "gemini-2.5-flash"
+JUDGE_MODEL = os.environ.get("JUDGE_MODEL", "gemini-3.1-flash-lite")
+JUDGE_FALLBACK = os.environ.get("JUDGE_FALLBACK", JUDGE_MODEL)
 KS = (1, 3, 5)
 
 # (chunking design, search mode). Hybrid and metadata filters cost no extra embeddings.
@@ -186,7 +189,7 @@ def code_checks(q: dict, a: dict) -> dict:
 
 
 def judge(q: dict, a: dict) -> dict:
-    from google.genai import types
+    from google.genai import errors, types
 
     evidence = "\n\n".join(t["output"] for t in a["trace"] if t["tool"] == "search") or "(no passages retrieved)"
     prompt = (f"{RUBRIC}\n\nQUESTION:\n{q['question']}\n\nREFERENCE ANSWER:\n{q['reference_answer']}\n\n"
@@ -195,12 +198,19 @@ def judge(q: dict, a: dict) -> dict:
         "correct": {"type": "integer", "enum": [0, 1]},
         "supported": {"type": "integer", "enum": [0, 1]},
         "reason": {"type": "string"}}, "required": ["correct", "supported", "reason"]}
-    response = index.genai_client().models.generate_content(
-        model=JUDGE_MODEL, contents=prompt,
-        config=types.GenerateContentConfig(temperature=0, response_mime_type="application/json",
-                                           response_json_schema=schema))
+    config = types.GenerateContentConfig(temperature=0, response_mime_type="application/json",
+                                         response_json_schema=schema)
+    for attempt, model in enumerate((JUDGE_MODEL, JUDGE_MODEL, JUDGE_FALLBACK)):   # retry, then fallback
+        try:
+            response = index.genai_client().models.generate_content(model=model, contents=prompt, config=config)
+            break
+        except errors.APIError as error:
+            if error.code not in (429, 500, 503) or attempt == 2:
+                raise
+            time.sleep(10)
     usage = response.usage_metadata
-    return {**json.loads(response.text), "judge_tokens": usage.total_token_count if usage else 0}
+    return {**json.loads(response.text), "judge_model": model,
+            "judge_tokens": usage.total_token_count if usage else 0}
 
 
 def run_judge(questions: list[dict], answers: dict[str, dict]) -> dict[str, dict]:
@@ -293,6 +303,7 @@ def main() -> int:
                      "judge_correct": v.get("correct", ""), "judge_supported": v.get("supported", ""),
                      "judge_reason": v.get("reason", ""),
                      "suggested_cause": suggest_cause(q, checks, v, retrieval_hit),
+                     "models": " ".join(a.get("models", [])), "judge_model": v.get("judge_model", ""),
                      "tokens": a["tokens"], "seconds": a["seconds"], "tool_calls": len(a["trace"]),
                      "guardrail_fired": int(bool(a["guardrail"])), "answer": a["answer"]})
     write_csv(EVAL / "results.csv", rows)

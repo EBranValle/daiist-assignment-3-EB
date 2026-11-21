@@ -33,6 +33,7 @@ from typing import Callable
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
     HumanInTheLoopMiddleware,
+    ModelFallbackMiddleware,
     ModelCallLimitMiddleware,
     ToolCallLimitMiddleware,
 )
@@ -47,7 +48,12 @@ from mcp.client.stdio import stdio_client
 from api_key import load_api_key
 
 ROOT = Path(__file__).resolve().parent
-CHAT_MODEL = os.environ.get("CHAT_MODEL", "gemini-2.5-flash")
+# Overridable with environment variables. gemini-3.8-flash was overloaded/out
+# of free quota when this was written; flash-lite answered reliably. Set
+# FALLBACK_MODEL to switch to it automatically when CHAT_MODEL fails
+# (answers record which model ran).
+CHAT_MODEL = os.environ.get("CHAT_MODEL", "gemini-3.1-flash-lite")
+FALLBACK_MODEL = os.environ.get("FALLBACK_MODEL", "")
 MAX_MODEL_CALLS = 8
 MAX_SEARCHES = 5
 
@@ -96,13 +102,17 @@ async def mcp_tools(session: ClientSession) -> list[StructuredTool]:
 
 class Harness:
     def __init__(self, tools: list[StructuredTool]):
-        self.model = ChatGoogleGenerativeAI(model=CHAT_MODEL, temperature=0, max_retries=6)
+        self.model = ChatGoogleGenerativeAI(model=CHAT_MODEL, temperature=0, timeout=120,
+                                            max_retries=0 if FALLBACK_MODEL else 6)
+        fallback = ([ModelFallbackMiddleware(ChatGoogleGenerativeAI(
+            model=FALLBACK_MODEL, temperature=0, max_retries=6, timeout=120))] if FALLBACK_MODEL else [])
         self.agent = create_agent(
             model=self.model,
             tools=tools,
             system_prompt=(ROOT / "AGENTS.md").read_text(encoding="utf-8"),
             middleware=[
                 HumanInTheLoopMiddleware(interrupt_on={"add_document": True}),
+                *fallback,
                 ModelCallLimitMiddleware(run_limit=MAX_MODEL_CALLS, exit_behavior="end"),
                 ToolCallLimitMiddleware(tool_name="search", run_limit=MAX_SEARCHES, exit_behavior="continue"),
             ],
@@ -151,6 +161,8 @@ class Harness:
             "tokens": sum((m.usage_metadata or {}).get("total_tokens", 0)
                           for m in messages if isinstance(m, AIMessage)),
             "model_calls": sum(isinstance(m, AIMessage) for m in messages),
+            "models": sorted({m.response_metadata.get("model_name", "?") for m in messages
+                              if isinstance(m, AIMessage)}),
             "seconds": round(time.time() - started, 2),
         }
 
@@ -190,7 +202,10 @@ class Harness:
 @asynccontextmanager
 async def open_agent():
     """Start server.py over stdio and yield a Harness bound to its tools."""
-    params = StdioServerParameters(command=sys.executable, args=["server.py"], cwd=str(ROOT))
+    load_api_key()   # puts the key in os.environ (from .env if needed)
+    # The MCP client passes only a few "safe" variables by default; the server needs the key.
+    params = StdioServerParameters(command=sys.executable, args=["server.py"], cwd=str(ROOT),
+                                   env=dict(os.environ))
     async with stdio_client(params) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()

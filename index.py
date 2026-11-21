@@ -467,14 +467,31 @@ def add_file(path: str | Path, design: str = DEFAULT_DESIGN) -> dict:
 # Search
 # ---------------------------------------------------------------------------
 
+def _query_key(query: str) -> str:
+    return f"{EMBED_MODEL}|{EMBED_DIM}|{query}"
+
+
 def embed_query(query: str) -> list[float]:
     """Query vectors are cached in index/ so repeated evaluations spend no quota."""
     cache = json.loads(QUERY_CACHE.read_text()) if QUERY_CACHE.exists() else {}
-    key = f"{EMBED_MODEL}|{EMBED_DIM}|{query}"
+    key = _query_key(query)
     if key not in cache:
         cache[key] = embed_texts([query], task="RETRIEVAL_QUERY")[0]
         QUERY_CACHE.write_text(json.dumps(cache))
     return cache[key]
+
+
+def warm_query_cache(queries: list[str]) -> int:
+    """Embed the test questions in advance, so search on them needs no API call
+    (check.py starts the server without the key in its environment)."""
+    cache = json.loads(QUERY_CACHE.read_text()) if QUERY_CACHE.exists() else {}
+    todo = list(dict.fromkeys(q for q in queries if _query_key(q) not in cache))
+    for i in range(0, len(todo), EMBED_BATCH):
+        batch = todo[i:i + EMBED_BATCH]
+        for q, v in zip(batch, embed_texts(batch, task="RETRIEVAL_QUERY")):
+            cache[_query_key(q)] = v
+        QUERY_CACHE.write_text(json.dumps(cache))
+    return len(todo)
 
 
 _bm25_cache: dict[str, dict] = {}
@@ -572,6 +589,12 @@ def main() -> int:
     # Default design first, so the served index is complete before the others.
     order = [DEFAULT_DESIGN] + [d for d in DESIGNS if d != DEFAULT_DESIGN]
     try:
+        questions_csv = ROOT / "eval" / "questions.csv"
+        if questions_csv.exists():
+            import csv
+            with questions_csv.open(newline="", encoding="utf-8") as f:
+                questions = [r["question"].strip() for r in csv.DictReader(f) if (r.get("question") or "").strip()]
+            print(f"Test questions: {warm_query_cache(questions)} newly embedded for the query cache")
         for design in order:
             chunks = all_chunks[design]
             embedded = embed_and_store(chunks, design)
