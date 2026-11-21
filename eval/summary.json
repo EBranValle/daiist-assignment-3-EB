@@ -30,7 +30,22 @@
   "mean_tokens": 5718,
   "mean_seconds": 3.1,
   "judge_agreement": {
-    "n": 0
+    "n": 40,
+    "correct": {
+      "agreement": 0.975,
+      "kappa": 0.931,
+      "disagreements": [
+        "q29"
+      ]
+    },
+    "supported": {
+      "agreement": 0.95,
+      "kappa": 0.0,
+      "disagreements": [
+        "q36",
+        "q39"
+      ]
+    }
   },
   "retrieval": [
     {
