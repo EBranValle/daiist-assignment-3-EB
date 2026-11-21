@@ -377,8 +377,13 @@ def embed_texts(texts: list[str], task: str = "RETRIEVAL_DOCUMENT") -> list[list
     config = types.EmbedContentConfig(task_type=task, output_dimensionality=EMBED_DIM)
     for attempt in range(6):
         try:
-            result = genai_client().models.embed_content(model=EMBED_MODEL, contents=texts, config=config)
+            # One Content per text: gemini-embedding-2 treats a plain list of
+            # strings as ONE multi-part input and returns a single vector.
+            contents = [types.Content(parts=[types.Part(text=t)]) for t in texts]
+            result = genai_client().models.embed_content(model=EMBED_MODEL, contents=contents, config=config)
             vectors = [e.values for e in result.embeddings]
+            if len(vectors) != len(texts):
+                raise RuntimeError(f"Sent {len(texts)} texts, got {len(vectors)} embeddings back")
             return [_normalise(v) for v in vectors]
         except errors.APIError as error:
             message = str(error)
@@ -474,7 +479,8 @@ def add_file(path: str | Path, design: str = DEFAULT_DESIGN) -> dict:
 # ---------------------------------------------------------------------------
 
 def _query_key(query: str) -> str:
-    return f"{EMBED_MODEL}|{EMBED_DIM}|{query}"
+    # "v2": entries written before the one-Content-per-text fix are ignored.
+    return f"v2|{EMBED_MODEL}|{EMBED_DIM}|{query}"
 
 
 def embed_query(query: str) -> list[float]:
