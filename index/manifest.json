@@ -39,6 +39,14 @@
       "max_words": 350,
       "prefix": true,
       "mean_words": 251
+    },
+    "words150": {
+      "chunks": 1446,
+      "method": "fixed",
+      "size": 150,
+      "overlap": 30,
+      "prefix": false,
+      "mean_words": 150
     }
   }
 }

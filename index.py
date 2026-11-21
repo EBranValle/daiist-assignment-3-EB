@@ -78,8 +78,9 @@ DESIGNS: dict[str, dict] = {
     # with "source - heading" prepended to the embedded text
     "sections": {"method": "section", "max_words": 350, "prefix": True},
 }
-# Served by server.py and embedded first. Provisional: "sections" fits in one
-# day's quota (~690 chunks); set this to the winner from `main.py evaluate`.
+# Served by server.py and embedded first. Chosen by hit rate (eval/retrieval.csv):
+# sections+vector 0.76/0.94/0.97 at k=1/3/5 vs words150 0.58/0.88/0.91 and
+# sections+hybrid 0.58/0.94/0.97.
 DEFAULT_DESIGN = "sections"
 DEFAULT_MODE = "vector"       # "vector" or "hybrid" (vector + BM25, no extra embeddings)
 DEFAULT_K = 5
