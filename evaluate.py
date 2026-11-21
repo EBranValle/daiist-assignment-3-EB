@@ -131,8 +131,9 @@ def evaluate_retrieval(questions: list[dict]) -> list[dict]:
     answerable = [q for q in questions if q["kind"] != "unanswerable"]
     rows = []
     for design, mode in RETRIEVAL_DESIGNS:
-        if index.collection(design).count() == 0:
-            print(f"  skipping {design}/{mode}: not indexed")
+        built = json.loads(index.MANIFEST.read_text()).get("designs", {}) if index.MANIFEST.exists() else {}
+        if design not in built:
+            print(f"  skipping {design}/{mode}: not fully indexed yet (run main.py index again)")
             continue
         row = {"design": design, "mode": mode}
         results = {q["id"]: index.search(q["question"], k=max(KS), design=design, mode=mode) for q in answerable}

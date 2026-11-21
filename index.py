@@ -51,13 +51,17 @@ SOURCES: list[dict] = [
     {"name": "MiFID II Delegated Regulation", "filename": "CELEX_32017R0565_EN_TXT.pdf", "licence": LICENCE,
      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32017R0565",
      "title": "Commission Delegated Regulation (EU) 2017/565 supplementing MiFID II"},
-]
-# Held back from the index: added later with the add_document tool to show an
-# unanswerable question becoming answerable. Lives in reserve/, not corpus/.
-RESERVE: list[dict] = [
     {"name": "PRIIPs", "filename": "CELEX_32014R1286_EN_TXT.pdf", "licence": LICENCE,
      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014R1286",
      "title": "Regulation (EU) No 1286/2014 on key information documents for PRIIPs"},
+]
+# Held back from the index: added later with the add_document tool to show an
+# unanswerable question (q34, q35: summary risk indicator, performance
+# scenarios) becoming answerable. Lives in reserve/, not corpus/.
+RESERVE: list[dict] = [
+    {"name": "PRIIPs RTS", "filename": "CELEX_32017R0653_EN_TXT.pdf", "licence": LICENCE,
+     "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32017R0653",
+     "title": "Commission Delegated Regulation (EU) 2017/653, regulatory technical standards for PRIIPs KIDs"},
 ]
 SUPPORTED = {".pdf", ".html", ".htm", ".txt", ".md"}
 
@@ -74,7 +78,9 @@ DESIGNS: dict[str, dict] = {
     # with "source - heading" prepended to the embedded text
     "sections": {"method": "section", "max_words": 350, "prefix": True},
 }
-DEFAULT_DESIGN = "words150"   # TODO: set to the winner from `main.py evaluate`
+# Served by server.py and embedded first. Provisional: "sections" fits in one
+# day's quota (~690 chunks); set this to the winner from `main.py evaluate`.
+DEFAULT_DESIGN = "sections"
 DEFAULT_MODE = "vector"       # "vector" or "hybrid" (vector + BM25, no extra embeddings)
 DEFAULT_K = 5
 
@@ -571,7 +577,7 @@ def main() -> int:
     download_corpus()
     files = sorted(p for p in CORPUS_DIR.iterdir() if p.suffix.lower() in SUPPORTED)
     manifest = {"embed_model": EMBED_MODEL, "dim": EMBED_DIM, "default_design": DEFAULT_DESIGN,
-                "documents": [], "designs": {}}
+                "documents": [], "designs": {}}   # designs: only fully embedded ones
     all_chunks = {design: [] for design in DESIGNS}
     for path in files:
         blocks = extract(path)
