@@ -1,6 +1,6 @@
 {
   "questions": 40,
-  "correct": 29,
+  "correct": 30,
   "unsupported": 0,
   "correct_refusals": 3,
   "wrong_refusals": 4,
@@ -14,7 +14,7 @@
     },
     "single": {
       "n": 26,
-      "correct": 23
+      "correct": 24
     },
     "unanswerable": {
       "n": 7,
@@ -22,7 +22,6 @@
     }
   },
   "suggested_causes": {
-    "retrieval miss": 1,
     "unsupported claim": 4,
     "wrong answer from right passage": 2,
     "wrong refusal": 4
@@ -32,9 +31,10 @@
   "judge_agreement": {
     "n": 40,
     "correct": {
-      "agreement": 0.975,
-      "kappa": 0.931,
+      "agreement": 0.95,
+      "kappa": 0.857,
       "disagreements": [
+        "q23",
         "q29"
       ]
     },
@@ -82,10 +82,10 @@
       "words@1": 282,
       "hit@3": 0.939,
       "all@3": 0.818,
-      "words@3": 844,
+      "words@3": 851,
       "hit@5": 0.97,
       "all@5": 0.848,
-      "words@5": 1390
+      "words@5": 1395
     }
   ]
 }

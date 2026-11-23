@@ -42,17 +42,33 @@ KS = (1, 3, 5)
 # (chunking design, search mode). Hybrid and metadata filters cost no extra embeddings.
 RETRIEVAL_DESIGNS = [(d, "vector") for d in index.DESIGNS] + [(index.DEFAULT_DESIGN, "hybrid")]
 
-# TODO: the rubric is yours to write. This draft only shows the shape the code expects.
 RUBRIC = f"""
-You grade an assistant's answer to a question about a document corpus.
+You grade an assistant's answer to a question about EU investment-services
+legislation (MiFID II, its Delegated Regulation, MiFIR, PRIIPs).
 
-correct = 1 if the answer agrees with the reference answer on every point the
-reference makes (extra correct detail is fine). For a question the corpus cannot
-answer, correct = 1 only if the assistant declines ("{REFUSAL}") instead of answering.
-A refusal to an answerable question is correct = 0.
+CORRECT (0 or 1)
+- correct = 1 when the answer covers every key point of the reference answer.
+  Small details may be missing.
+- If a whole part of a multi-part question is missing, correct = 0.
+- Extra detail is fine as long as it is accurate and does not contradict the
+  reference.
+- Question the corpus cannot answer (the reference says so): correct = 1 only
+  if the answer clearly says the corpus does not cover it ("{REFUSAL}"). It may
+  add one cited sentence about what the corpus covers nearby.
+- An answer that presents a related rule as if it were the answer is correct = 0.
+  It is correct = 1 only if it first says the corpus does not cover the question
+  and labels the related rule as context, not as the answer.
+- A refusal to a question the corpus can answer is always correct = 0.
 
-supported = 1 if every factual claim in the answer is stated in the evidence
-passages. A refusal is supported = 1. Any claim not in the evidence makes it 0.
+SUPPORTED (0 or 1)
+- supported = 1 when every claim is backed by the evidence passages. A faithful
+  paraphrase is fine; exact wording is not needed.
+- A claim is unsupported when the answer attributes a passage to a different
+  subject, law, authority or date than the passage itself has, even if the
+  words appear in the passage.
+- A claim is unsupported if the passage it cites does not say it, even when a
+  different evidence passage does.
+- A refusal makes no factual claims, so it is supported = 1.
 
 Give a one-sentence reason.
 """
@@ -136,7 +152,11 @@ def evaluate_retrieval(questions: list[dict]) -> list[dict]:
             print(f"  skipping {design}/{mode}: not fully indexed yet (run main.py index again)")
             continue
         row = {"design": design, "mode": mode}
-        results = {q["id"]: index.search(q["question"], k=max(KS), design=design, mode=mode) for q in answerable}
+        # Only the original corpus: documents added later (the add_document demo)
+        # exist in one design but not the others, which would skew the comparison.
+        corpus = [s["name"] for s in index.SOURCES]
+        results = {q["id"]: index.search(q["question"], k=max(KS), design=design, mode=mode, source=corpus)
+                   for q in answerable}
         for k in KS:
             any_hits = [any(hit(t, results[q["id"]][:k]) for t in targets(q)) for q in answerable]
             all_hits = [all(hit(t, results[q["id"]][:k]) for t in targets(q)) for q in answerable]
