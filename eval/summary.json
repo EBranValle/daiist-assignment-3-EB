@@ -1,6 +1,6 @@
 {
   "questions": 40,
-  "correct": 29,
+  "correct": 30,
   "unsupported": 0,
   "correct_refusals": 3,
   "wrong_refusals": 4,
@@ -14,7 +14,7 @@
     },
     "single": {
       "n": 26,
-      "correct": 23
+      "correct": 24
     },
     "unanswerable": {
       "n": 7,
@@ -22,7 +22,6 @@
     }
   },
   "suggested_causes": {
-    "retrieval miss": 1,
     "unsupported claim": 4,
     "wrong answer from right passage": 2,
     "wrong refusal": 4
@@ -32,9 +31,10 @@
   "judge_agreement": {
     "n": 40,
     "correct": {
-      "agreement": 0.975,
-      "kappa": 0.931,
+      "agreement": 0.95,
+      "kappa": 0.857,
       "disagreements": [
+        "q23",
         "q29"
       ]
     },
@@ -64,28 +64,28 @@
     {
       "design": "sections",
       "mode": "vector",
-      "hit@1": 0.758,
-      "all@1": 0.576,
-      "words@1": 260,
+      "hit@1": 0.727,
+      "all@1": 0.545,
+      "words@1": 253,
       "hit@3": 0.939,
       "all@3": 0.788,
-      "words@3": 813,
+      "words@3": 809,
       "hit@5": 0.97,
       "all@5": 0.879,
-      "words@5": 1339
+      "words@5": 1350
     },
     {
       "design": "sections",
       "mode": "hybrid",
-      "hit@1": 0.576,
+      "hit@1": 0.606,
       "all@1": 0.485,
-      "words@1": 282,
+      "words@1": 284,
       "hit@3": 0.939,
       "all@3": 0.818,
-      "words@3": 844,
+      "words@3": 850,
       "hit@5": 0.97,
       "all@5": 0.848,
-      "words@5": 1390
+      "words@5": 1380
     }
   ]
 }
