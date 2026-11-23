@@ -49,25 +49,23 @@ legislation (MiFID II, its Delegated Regulation, MiFIR, PRIIPs).
 CORRECT (0 or 1)
 - correct = 1 when the answer covers every key point of the reference answer.
   Small details may be missing.
-- If a whole part of a multi-part question is missing, correct = 0 (for example,
-  naming one of two authorities the question asks about).
+- If a whole part of a multi-part question is missing, correct = 0.
 - Extra detail is fine as long as it is accurate and does not contradict the
   reference.
 - Question the corpus cannot answer (the reference says so): correct = 1 only
   if the answer clearly says the corpus does not cover it ("{REFUSAL}"). It may
   add one cited sentence about what the corpus covers nearby.
-- An answer that presents a nearby rule as if it were the answer is correct = 0
-  (for example, EU-wide minimum fines given as a national supervisor's fines).
+- An answer that presents a related rule as if it were the answer is correct = 0.
   It is correct = 1 only if it first says the corpus does not cover the question
-  and labels the nearby rule as general EU context.
+  and labels the related rule as context, not as the answer.
 - A refusal to a question the corpus can answer is always correct = 0.
 
 SUPPORTED (0 or 1)
 - supported = 1 when every claim is backed by the evidence passages. A faithful
   paraphrase is fine; exact wording is not needed.
-- A claim is unsupported when the answer gives a passage a subject, authority
-  or date that the passage does not have (for example, calling EU rules a
-  national supervisor's rules, or using a 2017 text to describe a 2021 change).
+- A claim is unsupported when the answer attributes a passage to a different
+  subject, law, authority or date than the passage itself has, even if the
+  words appear in the passage.
 - A claim is unsupported if the passage it cites does not say it, even when a
   different evidence passage does.
 - A refusal makes no factual claims, so it is supported = 1.
