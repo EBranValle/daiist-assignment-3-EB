@@ -42,17 +42,35 @@ KS = (1, 3, 5)
 # (chunking design, search mode). Hybrid and metadata filters cost no extra embeddings.
 RETRIEVAL_DESIGNS = [(d, "vector") for d in index.DESIGNS] + [(index.DEFAULT_DESIGN, "hybrid")]
 
-# TODO: the rubric is yours to write. This draft only shows the shape the code expects.
 RUBRIC = f"""
-You grade an assistant's answer to a question about a document corpus.
+You grade an assistant's answer to a question about EU investment-services
+legislation (MiFID II, its Delegated Regulation, MiFIR, PRIIPs).
 
-correct = 1 if the answer agrees with the reference answer on every point the
-reference makes (extra correct detail is fine). For a question the corpus cannot
-answer, correct = 1 only if the assistant declines ("{REFUSAL}") instead of answering.
-A refusal to an answerable question is correct = 0.
+CORRECT (0 or 1)
+- correct = 1 when the answer covers every key point of the reference answer.
+  Small details may be missing.
+- If a whole part of a multi-part question is missing, correct = 0 (for example,
+  naming one of two authorities the question asks about).
+- Extra detail is fine as long as it is accurate and does not contradict the
+  reference.
+- Question the corpus cannot answer (the reference says so): correct = 1 only
+  if the answer clearly says the corpus does not cover it ("{REFUSAL}"). It may
+  add one cited sentence about what the corpus covers nearby.
+- An answer that presents a nearby rule as if it were the answer is correct = 0
+  (for example, EU-wide minimum fines given as a national supervisor's fines).
+  It is correct = 1 only if it first says the corpus does not cover the question
+  and labels the nearby rule as general EU context.
+- A refusal to a question the corpus can answer is always correct = 0.
 
-supported = 1 if every factual claim in the answer is stated in the evidence
-passages. A refusal is supported = 1. Any claim not in the evidence makes it 0.
+SUPPORTED (0 or 1)
+- supported = 1 when every claim is backed by the evidence passages. A faithful
+  paraphrase is fine; exact wording is not needed.
+- A claim is unsupported when the answer gives a passage a subject, authority
+  or date that the passage does not have (for example, calling EU rules a
+  national supervisor's rules, or using a 2017 text to describe a 2021 change).
+- A claim is unsupported if the passage it cites does not say it, even when a
+  different evidence passage does.
+- A refusal makes no factual claims, so it is supported = 1.
 
 Give a one-sentence reason.
 """
