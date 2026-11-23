@@ -27,12 +27,17 @@ def format_hits(hits: list[dict]) -> str:
     return "\n\n".join(f"[{h['source']} | {h['location']}] (score {h['score']:.3f})\n{h['text']}" for h in hits)
 
 
-# TODO: describe YOUR corpus in the docstring: the model reads it to decide when to search.
 @mcp.tool()
 def search(query: str) -> str:
-    """Search the document corpus and return the most relevant passages.
+    """Search EU investment-services legislation and return the most relevant passages.
 
-    Use this for every factual question about the corpus, before answering.
+    The corpus holds the English texts of MiFID II (Directive 2014/65/EU), the
+    MiFID II Delegated Regulation (EU) 2017/565, MiFIR (Regulation 600/2014) and
+    the PRIIPs Regulation (1286/2014), split by article, plus any document added
+    with add_document. It does not hold national law, supervisors' guidance or
+    later amendments.
+
+    Use this for every factual question about these rules, before answering.
     Phrase `query` as a specific question or keywords; search again with other
     wording if the first results do not answer it.
 
