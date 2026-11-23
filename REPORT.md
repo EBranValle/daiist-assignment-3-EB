@@ -1,8 +1,8 @@
 # Assignment 3 Report
 
-- **Name**:
-- **Student ID**:
-- **Group**: [BBADBA 5A | BBADBA 5B | PPLEDBA 5A]
+- **Name**: Edgar Andres Bran Valle
+- **Student ID**: 18789
+- **Group**: BBADBA 5B 
 
 ## Use case
 
