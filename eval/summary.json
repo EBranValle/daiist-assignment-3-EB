@@ -64,28 +64,28 @@
     {
       "design": "sections",
       "mode": "vector",
-      "hit@1": 0.727,
-      "all@1": 0.545,
-      "words@1": 253,
+      "hit@1": 0.758,
+      "all@1": 0.576,
+      "words@1": 260,
       "hit@3": 0.939,
       "all@3": 0.788,
-      "words@3": 809,
+      "words@3": 813,
       "hit@5": 0.97,
       "all@5": 0.879,
-      "words@5": 1350
+      "words@5": 1339
     },
     {
       "design": "sections",
       "mode": "hybrid",
-      "hit@1": 0.606,
+      "hit@1": 0.576,
       "all@1": 0.485,
-      "words@1": 284,
+      "words@1": 282,
       "hit@3": 0.939,
       "all@3": 0.818,
-      "words@3": 850,
+      "words@3": 851,
       "hit@5": 0.97,
       "all@5": 0.848,
-      "words@5": 1380
+      "words@5": 1395
     }
   ]
 }

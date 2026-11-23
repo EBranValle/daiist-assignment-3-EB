@@ -152,7 +152,11 @@ def evaluate_retrieval(questions: list[dict]) -> list[dict]:
             print(f"  skipping {design}/{mode}: not fully indexed yet (run main.py index again)")
             continue
         row = {"design": design, "mode": mode}
-        results = {q["id"]: index.search(q["question"], k=max(KS), design=design, mode=mode) for q in answerable}
+        # Only the original corpus: documents added later (the add_document demo)
+        # exist in one design but not the others, which would skew the comparison.
+        corpus = [s["name"] for s in index.SOURCES]
+        results = {q["id"]: index.search(q["question"], k=max(KS), design=design, mode=mode, source=corpus)
+                   for q in answerable}
         for k in KS:
             any_hits = [any(hit(t, results[q["id"]][:k]) for t in targets(q)) for q in answerable]
             all_hits = [all(hit(t, results[q["id"]][:k]) for t in targets(q)) for q in answerable]

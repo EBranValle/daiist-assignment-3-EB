@@ -537,10 +537,14 @@ def _bm25_scores(query: str, design: str) -> dict[str, float]:
 
 
 def search(query: str, k: int = DEFAULT_K, design: str = DEFAULT_DESIGN, mode: str = DEFAULT_MODE,
-           source: str | None = None) -> list[dict]:
-    """Top-k chunks: [{"id", "text", "source", "location", "score"}]. Optional source filter."""
+           source: str | list[str] | None = None) -> list[dict]:
+    """Top-k chunks: [{"id", "text", "source", "location", "score"}].
+    Optional filter: one source name, or a list of names."""
     col = collection(design)
-    where = {"source": source} if source else None
+    if isinstance(source, list):
+        where = {"source": {"$in": source}}
+    else:
+        where = {"source": source} if source else None
     pool = k if mode == "vector" else max(4 * k, 20)
     result = col.query(query_embeddings=[embed_query(query)], n_results=pool, where=where,
                        include=["documents", "metadatas", "distances"])
