@@ -490,4 +490,22 @@ Observations:
 
 ## AI use
 
-*What you used and how, or "none".*
+I used Claude Code (Anthropic) and an AI assistant throughout, as follows.
+
+**Code (Claude Code).**
+- It wrote `index.py`, `server.py`, `agent.py` and `evaluate.py`, and fixed the bugs found along the way: PDF heading detection, batch embedding with `gemini-embedding-2`, passing the API key to the MCP server, and the retrieval comparison skewed by the demo document.
+- It ran the indexing, the retrieval comparison, the agent evaluation and the judge, and it set up the cloud environment and the pull requests.
+
+**Drafts that I then decided on.**
+- Claude Code drafted `AGENTS.md`, the judge rubric and the subagent instructions.
+- I set the reasons for each rule from my use case, wrote the rubric's rules (what counts as correct, partial and supported), chose generic rubric examples so the agreement is not measured on cases described to the judge, and decided the subagent changes.
+
+**Test set.** AI provided summaries of the articles. The questions were drafted and later checked with AI for compliance with the assignment. I checked every reference answer and article number against the text.
+
+**This report.** Claude Code wrote the factual parts from the evaluation files (tables, counts, cost) and wrote down my answers for the analysis sections. I wrote the use case.
+
+**Mine.**
+- The use case and the choice of documents.
+- Choosing the design by the numbers.
+- All 40 grades in `eval/human_labels.csv`, graded before I read the judge's verdicts.
+- The failure classification, what to fix first, and the decision on whether and how users may rely on the system.
