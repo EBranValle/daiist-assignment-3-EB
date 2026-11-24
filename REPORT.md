@@ -311,11 +311,61 @@ You support a compliance analyst at an investment firm who checks what the firm 
 
 ## Adding a document
 
-*What happens when a document is already indexed. The unanswerable question, the document you added, the answer before and after.*
+**Already indexed.**
+- `add_document` names a document after its file (mapped to a short source name, e.g. `PRIIPs RTS`) and stores the file's SHA-256 with its chunks.
+- Same name and same content: nothing changes and nothing is re-embedded. The tool answers that the document is already indexed with identical content.
+- Same name but changed content: the old chunks are deleted and the new ones embedded, so no outdated passages remain.
+- In every case, chunks that already have a saved vector are never embedded again.
+
+**The demo** (full record: `eval/add_document_demo.md`).
+- *The question:* q34, "How is the summary risk indicator class from 1 to 7 calculated for a PRIIP?". It is unanswerable in the evaluated corpus, because PRIIPs Article 8 leaves the method to regulatory technical standards.
+- *The document added:* Delegated Regulation (EU) 2017/653, the PRIIPs RTS (`reserve/CELEX_32017R0653_EN_TXT.pdf`), added through the agent. I asked `main.py ask` to add the file, approved the call at the `Allow? [y/N]` prompt, and the 52-page document became 92 chunks.
+
+*Before* (evaluation run):
+> The provided corpus does not contain the specific calculation methodology for the summary risk indicator class (1 to 7) for a PRIIP. It notes that the methodology underpinning the presentation of risk and reward is to be specified in regulatory technical standards [PRIIPs | Article 8, p. 13].
+
+*After* (with the PRIIPs RTS indexed; the MRM class table is shortened here):
+> The Summary Risk Indicator (SRI) for a PRIIP is determined by applying the methodology for the presentation of risk set out in Annex II and the technical aspects for the presentation of the SRI set out in Annex III [PRIIPs RTS | Article 3 (‘What are the risks and what could I get in return?’ section), pp. 6-7]. Market risk is measured by the annualised volatility corresponding to the value-at-risk (VaR) at a confidence level of 97,5 % over the recommended holding period [PRIIPs RTS | ANNEX II (METHODOLOGY FOR THE PRESENTATION OF RISK), p. 15]. The PRIIP is assigned a Market Risk Measure (MRM) class from 1 (VEV < 0,5 %) to 7 (VEV > 80 %) [PRIIPs RTS | ANNEX II (METHODOLOGY FOR THE PRESENTATION OF RISK), p. 15]. … The SRI is presented in the key information document using a numerical scale from 1 to 7, where 1 is the lowest risk class and 7 is the highest [PRIIPs RTS | ANNEX III (PRESENTATION OF SRI), p. 26].
+
+What the demo shows:
+- *Before:* the agent declined and pointed to where the answer would be (the technical standards).
+- *After:* it answered from the new document with exact citations, at 8,477 tokens and 10 s.
+- *Note:* the "before" answer declined in its own words, not with the exact refusal sentence, so the code check counted it as an answered unanswerable question (see *Failures*).
 
 ## Harness and guardrails
 
-*Your AGENTS.md rules, the approval step, and your extra guardrail with one case where it fired.*
+**Harness** (`agent.py`).
+- A LangChain `create_agent` on Gemini (`gemini-3.1-flash-lite`).
+- Its tools are those of `server.py`, reached over MCP (stdio).
+- Its system prompt is `AGENTS.md`.
+- `main.py ask` prints the answer and the list of cited sources.
+- It returns the answer, the tool trace, the tokens and the seconds to `evaluate.py`.
+
+**`AGENTS.md` rules**, each with its reason in the file:
+1. Search before answering, every time.
+2. Answer only from the search results.
+3. Cite every claim with the exact `[source | location]` tag.
+4. When the corpus does not cover the question, reply exactly `The corpus does not cover this question.` A nearby rule may be added only when labelled as context.
+5. Label partial answers.
+6. Add documents only when asked.
+7. Be brief.
+
+The rules start by stating the use case (a compliance analyst, and the cost of a wrong answer), so the model knows why refusing beats guessing.
+
+**Approval step.**
+- `HumanInTheLoopMiddleware` pauses every `add_document` call until a person answers `Allow? [y/N]` at the terminal. A "no" is passed back to the model as a rejected tool call.
+- With no terminal (evaluation, `check.py`), the call is denied automatically, so the evaluation can never change the corpus.
+
+**Call limits.** At most 8 model calls and 5 searches per question.
+
+**Extra guardrail: citation verification.**
+- After the agent answers, code checks that every `[source | location]` tag in the answer was actually returned by `search` in this conversation, and that an answer that is not a refusal cites something.
+- If the check fails, the agent gets one chance to rewrite the answer. If the rewrite still fails, the answer is replaced by the refusal sentence, so no answer with an unverifiable citation ever reaches the analyst.
+
+**A case where it fired.** For "How long must recordings of client telephone conversations be kept?":
+- The first draft cited `[MiFID II | Article 16 (Organisational requirements), p. 50]` and `[MiFID II Delegated Regulation | Article 76 (…), p. 65]`, but search had returned `pp. 49-50` and `pp. 64-65`.
+- The guardrail rejected the shortened tags, and the rewrite used the exact ones.
+- It fired on 19 of the 40 evaluation questions. In most of them the rewrite passed; when it did not, a correct answer was withheld (see *Failures*).
 
 ## Evaluation
 
