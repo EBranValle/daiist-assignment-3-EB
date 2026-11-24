@@ -9,15 +9,98 @@ A compliance analyst at an investment bank needs to check what the firm is allow
 
 ## Corpus
 
-*Table: document, URL, date, licence, words.*
+Four EU legal acts on investment services and retail investment products, in English, from EUR-Lex. All are under the EUR-Lex reuse policy (Commission Decision 2011/833/EU: reuse authorised, with acknowledgement of the source), and none contains personal data. The PDFs are committed in `corpus/`, because EUR-Lex blocks scripted downloads with a bot challenge.
+
+| Document (source name) | URL | Date | Licence | Pages | Words |
+|---|---|---|---|---|---|
+| Directive 2014/65/EU, MiFID II (`MiFID II`) | https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014L0065 | 15 May 2014 | EUR-Lex reuse (Decision 2011/833/EU) | 148 | 75,950 |
+| Regulation (EU) No 600/2014, MiFIR (`MiFIR`) | https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014R0600 | 15 May 2014 | EUR-Lex reuse (Decision 2011/833/EU) | 65 | 36,478 |
+| Delegated Regulation (EU) 2017/565 (`MiFID II Delegated Regulation`) | https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32017R0565 | 25 April 2016 | EUR-Lex reuse (Decision 2011/833/EU) | 83 | 47,080 |
+| Regulation (EU) No 1286/2014, PRIIPs (`PRIIPs`) | https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014R1286 | 26 November 2014 | EUR-Lex reuse (Decision 2011/833/EU) | 23 | 13,891 |
+| **Total** | | | | **319** | **173,399** |
+
+The word counts are after cleaning (headers, footers and page numbers removed). Each act is the original text as published in the Official Journal, not a consolidated version, so later amendments (for example the 2021 MiFID II "quick fix") are not in the corpus.
+
+Held back for the add-document demo (see *Adding a document*): Delegated Regulation (EU) 2017/653, the PRIIPs regulatory technical standards (`PRIIPs RTS`), https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32017R0653, 8 March 2017, same licence.
 
 ## Ingestion
 
-*How you extract, clean and chunk; one extraction problem you fixed; chunk metadata; number of chunks.*
+**Extract and clean** (`index.py`).
+- pypdf extracts the text page by page.
+- Cleaning normalises Unicode (NFKC), removes soft hyphens, re-joins words hyphenated across lines and collapses whitespace.
+- It drops page numbers, running headers and footers (lines that repeat at the top or bottom of 30%+ of pages), and the Official Journal header line wherever pypdf places it.
+
+**Structure.**
+- A new section starts at every line that is exactly `Article N` or `ANNEX …`.
+- When a document gives its articles titles, the title on the next line is added to the location, e.g. `Article 25 (Assessment of suitability and appropriateness and reporting to clients)`. PRIIPs has no article titles; this is detected per document.
+- Text before Article 1 is labelled `Recitals`.
+
+**Chunking: two designs** (see *Retrieval*).
+- `sections`: one chunk per article. Articles longer than 350 words are split on sentence boundaries. The embedded text is prefixed with `source - heading`, so each chunk carries the article it belongs to.
+- `words150`: fixed windows of 150 words with a 30-word overlap, ignoring structure, with no prefix.
+
+**Chunk metadata.**
+- `source`: the document name, as used in citations.
+- `location`: the article with its title and page range, e.g. `Article 16 (Organisational requirements), pp. 49-50`. A `words150` window that crosses two articles is labelled `Article 3 to Article 4`.
+- Chunk number and word count.
+- Documents added with `add_document` also store their file's SHA-256 and path.
+- Search results show the citation tag `[source | location]`.
+
+**Embedding and storage.**
+- Chunks are embedded with `gemini-embedding-2` at 768 dimensions, normalised to unit length, as `RETRIEVAL_DOCUMENT`; questions are embedded as `RETRIEVAL_QUERY`.
+- Vectors are written to ChromaDB (cosine distance) in `index/` after every batch of 50. A rerun embeds only chunks without a saved vector, and query vectors are cached in `index/query_vectors.json`.
+- `index/` is 34 MB.
+
+**Number of chunks.**
+
+| Document | `sections` | `words150` |
+|---|---|---|
+| MiFID II | 291 | 633 |
+| MiFIR | 145 | 304 |
+| MiFID II Delegated Regulation | 191 | 393 |
+| PRIIPs | 65 | 116 |
+| **Total** | **692** (mean 251 words) | **1,446** (mean 149 words) |
+
+The add-document demo later added 92 `sections` chunks for the PRIIPs RTS.
+
+**Extraction problem fixed: false article headings.**
+- *The problem.* The first heading pattern accepted any line starting with "Article N" or a number followed by text. Numbered paragraphs ("1. This Regulation establishes uniform requirements…") and cross-references at the start of a line ("Article 114 of the Treaty on the Functioning of the European Union…", "Article 4(1)(52) of Directive 2014/65/EU;") became new sections, and so did the Official Journal header ("31.3.2017 L 87/1 …").
+- *The size of it.* MiFIR has 55 articles but produced 109 headings; the Delegated Regulation produced 240 headings for 91 articles.
+- *Why it matters.* The location of every chunk after a false heading was wrong, so citations would have pointed to a paragraph or a cross-referenced act instead of the real article.
+- *The fix.* A heading must be a line that is exactly `Article N` (optionally with a letter, e.g. `Article 4a`) or `ANNEX …`.
+- *The result.* MiFIR now has 56 sections (55 articles plus Recitals) and the Delegated Regulation 96 (91 articles plus annexes and recitals). Every article in MiFIR, MiFID II and the Delegated Regulation now carries its title.
 
 ## Test set
 
-*How you wrote it, counts by kind, two examples.*
+**How it was written.**
+- I started from summaries of the articles in the four PDFs (KID rules, suitability, best execution, reporting deadlines) and asked what a compliance analyst would need to check before advising or selling to a retail client.
+- The questions were drafted with the help of an AI assistant (see *AI use*). I checked every reference answer and article number against the text.
+- The questions are phrased as the analyst would ask them ("Can we…", "When must we…").
+
+**Unanswerable questions.** I chose topics just outside the corpus, so they are close to its subject, not obviously off-topic:
+- *Mentioned but not detailed in the corpus:* the summary risk indicator (q34) and the performance scenarios (q35), which PRIIPs leaves to the technical standards; and the CFD leverage limits (q38), where MiFIR only gives ESMA the power to intervene.
+- *Later amendments:* the 2021 MiFID II quick fix (q39) and sustainability preferences (q37).
+- *Law that is not in the corpus:* fines imposed by the Spanish CNMV (q36) and MiCA (q40).
+
+**When it was written.** `eval/questions.csv` was committed on 21 November, before the evaluation ran the same day, and no question has been changed since (see the git history).
+
+**Counts.**
+
+| Kind | Questions |
+|---|---|
+| single (one passage) | 26 |
+| multi (two passages) | 7 |
+| unanswerable | 7 |
+| **Total** | **40** |
+
+By expected source: PRIIPs 14, MiFID II 13, MiFID II Delegated Regulation 9, MiFIR 4. Each multi-passage question counts once per source.
+
+**Two examples.**
+
+| id | Kind | Question | Expected | Reference answer |
+|---|---|---|---|---|
+| q13 | single | How long must recordings of client telephone conversations be kept? | MiFID II, Article 16 | Five years, and up to seven years if the competent authority requests it. |
+| q27 | multi | What information must we collect from a client before giving investment advice, and what must the recommendation satisfy? | MiFID II, Article 25; MiFID II Delegated Regulation, Article 54 | Knowledge and experience, financial situation including ability to bear losses, and objectives including risk tolerance; the recommendation must meet the objectives, be financially bearable and understood, and nothing is recommended if nothing is suitable. |
 
 ## Retrieval
 
