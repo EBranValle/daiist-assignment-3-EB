@@ -499,5 +499,4 @@ I used Claude Code (Anthropic) and an AI assistant throughout, as follows.
 -Claude Code wrote the factual parts from the evaluation files (tables, counts, cost).
 - I chose the design by the numbers.
 - I graded all 40 grades in `eval/human_labels.csv`, graded before I read the judge's verdicts.
-- The failure classification, what to fix first, and the decision on whether and how users may rely on the system.
 - Claude also helped with grammar and report formatting. 
