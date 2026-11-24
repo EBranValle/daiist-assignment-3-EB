@@ -1,12 +1,11 @@
 # Assignment 3 Report
 
-- **Name**:
-- **Student ID**:
-- **Group**: [BBADBA 5A | BBADBA 5B | PPLEDBA 5A]
+- **Name**: Edgar Andres Bran Valle
+- **Student ID**: 18789
+- **Group**: BBADBA 5B 
 
 ## Use case
-
-*Who asks, what they do with the answer, and what a wrong answer costs compared with "I don't know".*
+A compliance analyst at an investment bank needs to check what the firm is allowed to do under the MiFID II, MiFIR, and PRIIPs regulations before advising or selling products/services to potential clients.  They use the agent's answer to decide what the firm is able to do and use the information to quote the cited article in the compliance file. A wrong answer can lead the firm to break the compliance rules and potentially face fines, client damage claims, and lawsuits. An "I don't know" answer by the agent only costs the analyst time to look for the information elsewhere instead of facing large repercussions. A wrong answer is far more damaging than a refusal. 
 
 ## Corpus
 
@@ -74,8 +73,8 @@ The add-document demo later added 92 `sections` chunks for the PRIIPs RTS.
 ## Test set
 
 **How it was written.**
-- I started from summaries of the articles in the four PDFs (KID rules, suitability, best execution, reporting deadlines) and asked what a compliance analyst would need to check before advising or selling to a retail client.
-- The questions were drafted with the help of an AI assistant (see *AI use*). I checked every reference answer and article number against the text.
+- I started from summaries of the articles provided by AI in the four PDFs (KID rules, suitability, best execution, reporting deadlines) and asked what a compliance analyst would need to check before advising or selling to a retail client.
+- The questions were drafted and later checked with AI for assigment complience. I checked every reference answer and article number against the text.
 - The questions are phrased as the analyst would ask them ("Can we…", "When must we…").
 
 **Unanswerable questions.** I chose topics just outside the corpus, so they are close to its subject, not obviously off-topic:
