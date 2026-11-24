@@ -105,7 +105,26 @@ By expected source: PRIIPs 14, MiFID II 13, MiFID II Delegated Regulation 9, MiF
 
 ## Retrieval
 
-*Hit rate at 1/3/5 per design, words added to the prompt, the design you chose.*
+**Method.**
+- For each of the 33 answerable questions, the top-k chunks are compared with `expected_source` and `expected_location`. A hit is the right document and the right article (or an overlapping page range).
+- *hit@k*: at least one expected passage is among the top k. *all@k*: every expected passage is (this matters for the multi-passage questions).
+- Only the four original documents are searched, so the demo document cannot skew the comparison.
+- Code: `evaluate.py`; results: `eval/retrieval.csv`.
+
+**Three designs.** Two chunkings, plus hybrid search on the better one. The hybrid search is reciprocal rank fusion of the vector ranking and a BM25 keyword ranking, and needs no extra embeddings.
+
+| Design | hit@1 | hit@3 | hit@5 | all@5 | Words added to the prompt (k=1 / 3 / 5) |
+|---|---|---|---|---|---|
+| `words150`, vector | 0.58 | 0.88 | 0.91 | 0.79 | 150 / 450 / 750 |
+| **`sections`, vector** | **0.76** | **0.94** | **0.97** | **0.88** | 260 / 813 / 1,339 |
+| `sections`, hybrid | 0.58 | 0.94 | 0.97 | 0.85 | 282 / 851 / 1,395 |
+
+**Design chosen: `sections` with vector search.** The agent and the server use it, with k = 5.
+- It has the best hit rate at every k: 0.76 against 0.58 at k = 1, and at k = 5 it finds a right passage for 32 of 33 questions.
+- `words150` adds fewer words to the prompt, but finds the right passage less often. A 150-word window often cuts an article in half and carries no article title, while a `sections` chunk keeps the article together and is embedded with its title.
+- Hybrid search matches vector search at k = 3 and 5 but is clearly worse at k = 1, so it adds nothing here.
+- The cost of `sections` is about 1,340 words of context at k = 5, which is small for the model.
+- The one question missed even at k = 5 is q23 (expected: Delegated Regulation, Article 56). It retrieves MiFID II Annex II on professional clients instead, which arguably also answers the question.
 
 ## Tools and subagent
 
