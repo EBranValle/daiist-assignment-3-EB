@@ -73,7 +73,35 @@ The add-document demo later added 92 `sections` chunks for the PRIIPs RTS.
 
 ## Test set
 
-*How you wrote it, counts by kind, two examples.*
+**How it was written.**
+- I started from summaries of the articles in the four PDFs (KID rules, suitability, best execution, reporting deadlines) and asked what a compliance analyst would need to check before advising or selling to a retail client.
+- The questions were drafted with the help of an AI assistant (see *AI use*). I checked every reference answer and article number against the text.
+- The questions are phrased as the analyst would ask them ("Can we…", "When must we…").
+
+**Unanswerable questions.** I chose topics just outside the corpus, so they are close to its subject, not obviously off-topic:
+- *Mentioned but not detailed in the corpus:* the summary risk indicator (q34) and the performance scenarios (q35), which PRIIPs leaves to the technical standards; and the CFD leverage limits (q38), where MiFIR only gives ESMA the power to intervene.
+- *Later amendments:* the 2021 MiFID II quick fix (q39) and sustainability preferences (q37).
+- *Law that is not in the corpus:* fines imposed by the Spanish CNMV (q36) and MiCA (q40).
+
+**When it was written.** `eval/questions.csv` was committed on 21 November, before the evaluation ran the same day, and no question has been changed since (see the git history).
+
+**Counts.**
+
+| Kind | Questions |
+|---|---|
+| single (one passage) | 26 |
+| multi (two passages) | 7 |
+| unanswerable | 7 |
+| **Total** | **40** |
+
+By expected source: PRIIPs 14, MiFID II 13, MiFID II Delegated Regulation 9, MiFIR 4. Each multi-passage question counts once per source.
+
+**Two examples.**
+
+| id | Kind | Question | Expected | Reference answer |
+|---|---|---|---|---|
+| q13 | single | How long must recordings of client telephone conversations be kept? | MiFID II, Article 16 | Five years, and up to seven years if the competent authority requests it. |
+| q27 | multi | What information must we collect from a client before giving investment advice, and what must the recommendation satisfy? | MiFID II, Article 25; MiFID II Delegated Regulation, Article 54 | Knowledge and experience, financial situation including ability to bear losses, and objectives including risk tolerance; the recommendation must meet the objectives, be financially bearable and understood, and nothing is recommended if nothing is suitable. |
 
 ## Retrieval
 
