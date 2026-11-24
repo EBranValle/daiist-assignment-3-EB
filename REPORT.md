@@ -128,56 +128,71 @@ By expected source: PRIIPs 14, MiFID II 13, MiFID II Delegated Regulation 9, MiF
 
 ## Tools and subagent
 
-*Your tools' descriptions, one search result, the subagent's instructions, one transcript from your editor.*
+**MCP server** (`server.py`, registered as `corpus` in `.mcp.json` and `.vscode/mcp.json`). It loads `index/` at startup, never re-embeds the corpus, and writes nothing to stdout. The tool descriptions are the docstrings the model reads:
 
- ▐▛███▛█   Claude Code v2.1.330
-▝▜██████▀  Opus 5.5 · Claude Pro
- ▝▝   ▝▝   /workspaces/daiist-assignment-3-EB
+`search(query)`:
+```text
+Search EU investment-services legislation and return the most relevant passages.
 
-▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+The corpus holds the English texts of MiFID II (Directive 2014/65/EU), the
+MiFID II Delegated Regulation (EU) 2017/565, MiFIR (Regulation 600/2014) and
+the PRIIPs Regulation (1286/2014), split by article, plus any document added
+with add_document. It does not hold national law, supervisors' guidance or
+later amendments.
 
-❯ /mcp 
-  ⎿  MCP dialog dismissed
+Use this for every factual question about these rules, before answering.
+Phrase `query` as a specific question or keywords; search again with other
+wording if the first results do not answer it.
 
-❯ /agents                                                                       
-  ⎿  The /agents wizard has been removed.
+Returns up to 5 passages. Each starts with a citation tag
+`[source | location]` (document name, then section and page). Cite a passage
+by copying its tag exactly.
+```
 
-     Ask Claude to create or update subagents for you (e.g. "create a code-reviewer subagent that ..."),
-     or edit the files directly:
-       • .claude/agents/       (this project)
-       • ~/.claude/agents/     (all projects)
+`add_document(path)`:
+```text
+Add one document (PDF, HTML, TXT or MD file on this machine) to the corpus.
 
-     Docs: https://code.claude.com/docs/en/sub-agents
+`path` is the file's path. The file is extracted, chunked, embedded and
+stored with the same pipeline as the rest of the corpus, after which search
+can find it. The document is named after the file. If a document with that
+name is already indexed with identical content, nothing changes; if its
+content changed, its old passages are replaced.
 
-❯ Which subagents are available in this project?                                
+Returns what happened: added, replaced or unchanged, with chunk counts.
+```
 
-  Read 1 file, listed 1 directory · 1 failed (ctrl+o to expand)
+**One search result.** The first two of the five passages for q13, "How long must recordings of client telephone conversations be kept?":
+```text
+[MiFID II | Article 16 (Organisational requirements), p. 49] (score 0.819)
+6. An investment firm shall arrange for records to be kept of all services, activities and transactions undertaken by it which shall be sufficient to enable the competent authority to fulfil its supervisory tasks and to perform the enforcement actions under this Directive, Regulation (EU) No 600/2014, Directive 2014/57/EU and Regulation (EU) No 596/2014, and in particular to ascertain that the investment firm has complied with all obligations including those with respect to clients or potential clients and to the integr …
 
-● This project defines one subagent of its own, in
-  .claude/agents/corpus-researcher.md:
+[MiFID II Delegated Regulation | Article 76 (Recording of telephone conversations or electronic communications), pp. 64-65] (score 0.817)
+7. Investment firms shall demonstrate the policies, procedures and management oversight of the recording rules to the relevant competent authorities upon request. 8. Before investment firms provide investment services and activities relating to the reception, transmission and execution of orders to new and existing clients, firms shall inform the client of the following: (a) that the conversations and communications are being recorded; and (b) that a copy of …
+```
 
-  - corpus-researcher: answers questions about EU investment-services rules
-    using the indexed legal texts: MiFID II (Directive 2014/65/EU), the MiFID II
-    Delegated Regulation (EU) 2017/565, MiFIR (Regulation 600/2014) and the
-    PRIIPs Regulation (1286/2014).
-    - Tools: only mcp__corpus__search.
-    - Rules: it answers only from the search results and cites every claim with
-      the exact passage tag. If the corpus doesn't have the answer, it replies
-      The corpus does not cover this question. It also labels partial answers
-      and keeps replies short.
-    - What it doesn't cover: it notes that national law, supervisors' practice,
-      later amendments and other regulations (e.g. MiCA or the PRIIPs technical
-      standards) usually aren't in the corpus.
+**Subagent** (`.claude/agents/corpus-researcher.md`). Its only tool is `mcp__corpus__search`:
+```markdown
+---
+name: corpus-researcher
+description: Answers questions about EU investment-services rules from the indexed legal texts: MiFID II (Directive 2014/65/EU), the MiFID II Delegated Regulation (EU) 2017/565, MiFIR (Regulation 600/2014) and the PRIIPs Regulation (1286/2014), plus any document added with add_document. Delegate to it any question on investor protection, suitability and appropriateness, inducements, costs and charges disclosure, best execution, record-keeping, client reporting, transparency and transaction reporting, product intervention, or PRIIPs key information documents, when the answer must be cited to the article.
+tools: mcp__corpus__search
+---
 
-  You have no user-level subagents in ~/.claude/agents/.
+You support a compliance analyst at an investment firm who checks what the firm must do under MiFID II, MiFIR and PRIIPs before advising or selling to retail clients. A wrong answer can lead the firm to break the rules and face fines, client damages claims or a product ban, so an honest "not covered" is better than a guess. Your only source is the `search` tool of the corpus server.
 
-  Claude Code also comes with these general agents: general-purpose, Explore,
-  Plan, claude-code-guide, statusline-setup, and a catch-all claude agent.
+1. Search before answering. Search again with different wording (article topic, defined terms such as "retail client", "inducement", "key information document") if the first results do not answer the question. For a question that combines two rules, search for each part separately.
+2. Answer only from the passages the search returned. Do not add rules, numbers or dates from memory, even if you believe they are correct: the analyst must be able to show the exact article behind every claim.
+3. Cite every factual sentence with the passage tag copied exactly as the tool printed it, e.g. `[MiFID II | Article 16 (Organisational requirements), pp. 49-50]`. Never invent, shorten or merge tags.
+4. If the passages do not contain the answer, reply exactly: `The corpus does not cover this question.` You may then add one cited sentence on what the corpus covers nearby, labelled as context ("For context, the corpus covers ..."), never presented as the answer. National law, supervisors' practice, later amendments and other regulations (e.g. MiCA) are usually not covered.
+5. If only part of the question is answered, answer that part with citations and say clearly which part is not covered, so the analyst knows what to look up elsewhere.
+6. Be concise: start with a one- or two-sentence direct answer, then the supporting points, each cited. Use more detail only when the question has several parts. End with the list of sources you cited.
+```
 
-✻ Baked for 8s · done 6:17 PM
-
-❯ Use the corpus-researcher subagent to answer: When must a suitability         
-  statement be given to a retail client?                                        
+**Transcript from Claude Code** (in GitHub Codespaces, 23 November). The full export is in `eval/subagent_transcript.txt`. Claude Code delegated to `corpus-researcher`, which searched the corpus and answered with exact citation tags; Claude Code then passed on the answer. The subagent's search calls are collapsed in this export view. The transcript was recorded with an earlier version of the subagent's instructions, before the use-case paragraph, the context labelling and the answer-length rule shown above were added.
+```text
+❯ Use the corpus-researcher subagent to answer: When must a suitability
+  statement be given to a retail client?
 
 ● corpus-researcher(Suitability statement timing question)
   ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
@@ -292,9 +307,7 @@ By expected source: PRIIPs 14, MiFID II 13, MiFID II Delegated Regulation 9, MiF
 ✻ Cooked for 5s · done 6:18 PM
 
 ● Agent "Suitability statement timing question" finished · 22s
-
-
-
+```
 
 ## Adding a document
 
