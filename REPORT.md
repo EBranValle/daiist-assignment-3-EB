@@ -5,8 +5,7 @@
 - **Group**: BBADBA 5B 
 
 ## Use case
-
-*Who asks, what they do with the answer, and what a wrong answer costs compared with "I don't know".*
+A compliance analyst at an investment bank needs to check what the firm is allowed to do under the MiFID II, MiFIR, and PRIIPs regulations before advising or selling products/services to potential clients.  They use the agent's answer to decide what the firm is able to do and use the information to quote the cited article in the compliance file. A wrong answer can lead the firm to break the compliance rules and potentially face fines, client damage claims, and lawsuits. An "I don't know" answer by the agent only costs the analyst time to look for the information elsewhere instead of facing large repercussions. A wrong answer is far more damaging than a refusal. 
 
 ## Corpus
 
