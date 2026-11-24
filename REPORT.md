@@ -365,7 +365,7 @@ The rules start by stating the use case (a compliance analyst, and the cost of a
 **A case where it fired.** For "How long must recordings of client telephone conversations be kept?":
 - The first draft cited `[MiFID II | Article 16 (Organisational requirements), p. 50]` and `[MiFID II Delegated Regulation | Article 76 (…), p. 65]`, but search had returned `pp. 49-50` and `pp. 64-65`.
 - The guardrail rejected the shortened tags, and the rewrite used the exact ones.
-- It fired on 19 of the 40 evaluation questions. In most of them the rewrite passed; when it did not, a correct answer was withheld (see *Failures*).
+- It fired on 19 of the 40 evaluation questions. The rewrite passed in 15; in 4 (q10, q14, q28, q33) it failed again and the answer was withheld. Those 4 are exactly the wrong refusals in *Failures*.
 
 ## Evaluation
 
