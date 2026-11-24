@@ -104,60 +104,94 @@ By expected source: PRIIPs 14, MiFID II 13, MiFID II Delegated Regulation 9, MiF
 
 ## Retrieval
 
-*Hit rate at 1/3/5 per design, words added to the prompt, the design you chose.*
+**Method.**
+- For each of the 33 answerable questions, the top-k chunks are compared with `expected_source` and `expected_location`. A hit is the right document and the right article (or an overlapping page range).
+- *hit@k*: at least one expected passage is among the top k. *all@k*: every expected passage is (this matters for the multi-passage questions).
+- Only the four original documents are searched, so the demo document cannot skew the comparison.
+- Code: `evaluate.py`; results: `eval/retrieval.csv`.
+
+**Three designs.** Two chunkings, plus hybrid search on the better one. The hybrid search is reciprocal rank fusion of the vector ranking and a BM25 keyword ranking, and needs no extra embeddings.
+
+| Design | hit@1 | hit@3 | hit@5 | all@5 | Words added to the prompt (k=1 / 3 / 5) |
+|---|---|---|---|---|---|
+| `words150`, vector | 0.58 | 0.88 | 0.91 | 0.79 | 150 / 450 / 750 |
+| **`sections`, vector** | **0.76** | **0.94** | **0.97** | **0.88** | 260 / 813 / 1,339 |
+| `sections`, hybrid | 0.58 | 0.94 | 0.97 | 0.85 | 282 / 851 / 1,395 |
+
+**Design chosen: `sections` with vector search.** The agent and the server use it, with k = 5.
+- It has the best hit rate at every k: 0.76 against 0.58 at k = 1, and at k = 5 it finds a right passage for 32 of 33 questions.
+- `words150` adds fewer words to the prompt, but finds the right passage less often. A 150-word window often cuts an article in half and carries no article title, while a `sections` chunk keeps the article together and is embedded with its title.
+- Hybrid search matches vector search at k = 3 and 5 but is clearly worse at k = 1, so it adds nothing here.
+- The cost of `sections` is about 1,340 words of context at k = 5, which is small for the model.
+- The one question missed even at k = 5 is q23 (expected: Delegated Regulation, Article 56). It retrieves MiFID II Annex II on professional clients instead, which arguably also answers the question.
 
 ## Tools and subagent
 
-*Your tools' descriptions, one search result, the subagent's instructions, one transcript from your editor.*
+**MCP server** (`server.py`, registered as `corpus` in `.mcp.json` and `.vscode/mcp.json`). It loads `index/` at startup, never re-embeds the corpus, and writes nothing to stdout. The tool descriptions are the docstrings the model reads:
 
- ▐▛███▛█   Claude Code v2.1.330
-▝▜██████▀  Opus 5.5 · Claude Pro
- ▝▝   ▝▝   /workspaces/daiist-assignment-3-EB
+`search(query)`:
+```text
+Search EU investment-services legislation and return the most relevant passages.
 
-▎ [✻] [✻] [✻] · Share Claude Code and earn $10 in usage credits · /passes
+The corpus holds the English texts of MiFID II (Directive 2014/65/EU), the
+MiFID II Delegated Regulation (EU) 2017/565, MiFIR (Regulation 600/2014) and
+the PRIIPs Regulation (1286/2014), split by article, plus any document added
+with add_document. It does not hold national law, supervisors' guidance or
+later amendments.
 
-❯ /mcp 
-  ⎿  MCP dialog dismissed
+Use this for every factual question about these rules, before answering.
+Phrase `query` as a specific question or keywords; search again with other
+wording if the first results do not answer it.
 
-❯ /agents                                                                       
-  ⎿  The /agents wizard has been removed.
+Returns up to 5 passages. Each starts with a citation tag
+`[source | location]` (document name, then section and page). Cite a passage
+by copying its tag exactly.
+```
 
-     Ask Claude to create or update subagents for you (e.g. "create a code-reviewer subagent that ..."),
-     or edit the files directly:
-       • .claude/agents/       (this project)
-       • ~/.claude/agents/     (all projects)
+`add_document(path)`:
+```text
+Add one document (PDF, HTML, TXT or MD file on this machine) to the corpus.
 
-     Docs: https://code.claude.com/docs/en/sub-agents
+`path` is the file's path. The file is extracted, chunked, embedded and
+stored with the same pipeline as the rest of the corpus, after which search
+can find it. The document is named after the file. If a document with that
+name is already indexed with identical content, nothing changes; if its
+content changed, its old passages are replaced.
 
-❯ Which subagents are available in this project?                                
+Returns what happened: added, replaced or unchanged, with chunk counts.
+```
 
-  Read 1 file, listed 1 directory · 1 failed (ctrl+o to expand)
+**One search result.** The first two of the five passages for q13, "How long must recordings of client telephone conversations be kept?":
+```text
+[MiFID II | Article 16 (Organisational requirements), p. 49] (score 0.819)
+6. An investment firm shall arrange for records to be kept of all services, activities and transactions undertaken by it which shall be sufficient to enable the competent authority to fulfil its supervisory tasks and to perform the enforcement actions under this Directive, Regulation (EU) No 600/2014, Directive 2014/57/EU and Regulation (EU) No 596/2014, and in particular to ascertain that the investment firm has complied with all obligations including those with respect to clients or potential clients and to the integr …
 
-● This project defines one subagent of its own, in
-  .claude/agents/corpus-researcher.md:
+[MiFID II Delegated Regulation | Article 76 (Recording of telephone conversations or electronic communications), pp. 64-65] (score 0.817)
+7. Investment firms shall demonstrate the policies, procedures and management oversight of the recording rules to the relevant competent authorities upon request. 8. Before investment firms provide investment services and activities relating to the reception, transmission and execution of orders to new and existing clients, firms shall inform the client of the following: (a) that the conversations and communications are being recorded; and (b) that a copy of …
+```
 
-  - corpus-researcher: answers questions about EU investment-services rules
-    using the indexed legal texts: MiFID II (Directive 2014/65/EU), the MiFID II
-    Delegated Regulation (EU) 2017/565, MiFIR (Regulation 600/2014) and the
-    PRIIPs Regulation (1286/2014).
-    - Tools: only mcp__corpus__search.
-    - Rules: it answers only from the search results and cites every claim with
-      the exact passage tag. If the corpus doesn't have the answer, it replies
-      The corpus does not cover this question. It also labels partial answers
-      and keeps replies short.
-    - What it doesn't cover: it notes that national law, supervisors' practice,
-      later amendments and other regulations (e.g. MiCA or the PRIIPs technical
-      standards) usually aren't in the corpus.
+**Subagent** (`.claude/agents/corpus-researcher.md`). Its only tool is `mcp__corpus__search`:
+```markdown
+---
+name: corpus-researcher
+description: Answers questions about EU investment-services rules from the indexed legal texts: MiFID II (Directive 2014/65/EU), the MiFID II Delegated Regulation (EU) 2017/565, MiFIR (Regulation 600/2014) and the PRIIPs Regulation (1286/2014), plus any document added with add_document. Delegate to it any question on investor protection, suitability and appropriateness, inducements, costs and charges disclosure, best execution, record-keeping, client reporting, transparency and transaction reporting, product intervention, or PRIIPs key information documents, when the answer must be cited to the article.
+tools: mcp__corpus__search
+---
 
-  You have no user-level subagents in ~/.claude/agents/.
+You support a compliance analyst at an investment firm who checks what the firm must do under MiFID II, MiFIR and PRIIPs before advising or selling to retail clients. A wrong answer can lead the firm to break the rules and face fines, client damages claims or a product ban, so an honest "not covered" is better than a guess. Your only source is the `search` tool of the corpus server.
 
-  Claude Code also comes with these general agents: general-purpose, Explore,
-  Plan, claude-code-guide, statusline-setup, and a catch-all claude agent.
+1. Search before answering. Search again with different wording (article topic, defined terms such as "retail client", "inducement", "key information document") if the first results do not answer the question. For a question that combines two rules, search for each part separately.
+2. Answer only from the passages the search returned. Do not add rules, numbers or dates from memory, even if you believe they are correct: the analyst must be able to show the exact article behind every claim.
+3. Cite every factual sentence with the passage tag copied exactly as the tool printed it, e.g. `[MiFID II | Article 16 (Organisational requirements), pp. 49-50]`. Never invent, shorten or merge tags.
+4. If the passages do not contain the answer, reply exactly: `The corpus does not cover this question.` You may then add one cited sentence on what the corpus covers nearby, labelled as context ("For context, the corpus covers ..."), never presented as the answer. National law, supervisors' practice, later amendments and other regulations (e.g. MiCA) are usually not covered.
+5. If only part of the question is answered, answer that part with citations and say clearly which part is not covered, so the analyst knows what to look up elsewhere.
+6. Be concise: start with a one- or two-sentence direct answer, then the supporting points, each cited. Use more detail only when the question has several parts. End with the list of sources you cited.
+```
 
-✻ Baked for 8s · done 6:17 PM
-
-❯ Use the corpus-researcher subagent to answer: When must a suitability         
-  statement be given to a retail client?                                        
+**Transcript from Claude Code** (in GitHub Codespaces, 23 November). The full export is in `eval/subagent_transcript.txt`. Claude Code delegated to `corpus-researcher`, which searched the corpus and answered with exact citation tags; Claude Code then passed on the answer. The subagent's search calls are collapsed in this export view. The transcript was recorded with an earlier version of the subagent's instructions, before the use-case paragraph, the context labelling and the answer-length rule shown above were added.
+```text
+❯ Use the corpus-researcher subagent to answer: When must a suitability
+  statement be given to a retail client?
 
 ● corpus-researcher(Suitability statement timing question)
   ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
@@ -272,30 +306,206 @@ By expected source: PRIIPs 14, MiFID II 13, MiFID II Delegated Regulation 9, MiF
 ✻ Cooked for 5s · done 6:18 PM
 
 ● Agent "Suitability statement timing question" finished · 22s
-
-
-
+```
 
 ## Adding a document
 
-*What happens when a document is already indexed. The unanswerable question, the document you added, the answer before and after.*
+**Already indexed.**
+- `add_document` names a document after its file (mapped to a short source name, e.g. `PRIIPs RTS`) and stores the file's SHA-256 with its chunks.
+- Same name and same content: nothing changes and nothing is re-embedded. The tool answers that the document is already indexed with identical content.
+- Same name but changed content: the old chunks are deleted and the new ones embedded, so no outdated passages remain.
+- In every case, chunks that already have a saved vector are never embedded again.
+
+**The demo** (full record: `eval/add_document_demo.md`).
+- *The question:* q34, "How is the summary risk indicator class from 1 to 7 calculated for a PRIIP?". It is unanswerable in the evaluated corpus, because PRIIPs Article 8 leaves the method to regulatory technical standards.
+- *The document added:* Delegated Regulation (EU) 2017/653, the PRIIPs RTS (`reserve/CELEX_32017R0653_EN_TXT.pdf`), added through the agent. I asked `main.py ask` to add the file, approved the call at the `Allow? [y/N]` prompt, and the 52-page document became 92 chunks.
+
+*Before* (evaluation run):
+> The provided corpus does not contain the specific calculation methodology for the summary risk indicator class (1 to 7) for a PRIIP. It notes that the methodology underpinning the presentation of risk and reward is to be specified in regulatory technical standards [PRIIPs | Article 8, p. 13].
+
+*After* (with the PRIIPs RTS indexed; the MRM class table is shortened here):
+> The Summary Risk Indicator (SRI) for a PRIIP is determined by applying the methodology for the presentation of risk set out in Annex II and the technical aspects for the presentation of the SRI set out in Annex III [PRIIPs RTS | Article 3 (‘What are the risks and what could I get in return?’ section), pp. 6-7]. Market risk is measured by the annualised volatility corresponding to the value-at-risk (VaR) at a confidence level of 97,5 % over the recommended holding period [PRIIPs RTS | ANNEX II (METHODOLOGY FOR THE PRESENTATION OF RISK), p. 15]. The PRIIP is assigned a Market Risk Measure (MRM) class from 1 (VEV < 0,5 %) to 7 (VEV > 80 %) [PRIIPs RTS | ANNEX II (METHODOLOGY FOR THE PRESENTATION OF RISK), p. 15]. … The SRI is presented in the key information document using a numerical scale from 1 to 7, where 1 is the lowest risk class and 7 is the highest [PRIIPs RTS | ANNEX III (PRESENTATION OF SRI), p. 26].
+
+What the demo shows:
+- *Before:* the agent declined and pointed to where the answer would be (the technical standards).
+- *After:* it answered from the new document with exact citations, at 8,477 tokens and 10 s.
+- *Note:* the "before" answer declined in its own words, not with the exact refusal sentence, so the code check counted it as an answered unanswerable question (see *Failures*).
 
 ## Harness and guardrails
 
-*Your AGENTS.md rules, the approval step, and your extra guardrail with one case where it fired.*
+**Harness** (`agent.py`).
+- A LangChain `create_agent` on Gemini (`gemini-3.1-flash-lite`).
+- Its tools are those of `server.py`, reached over MCP (stdio).
+- Its system prompt is `AGENTS.md`.
+- `main.py ask` prints the answer and the list of cited sources.
+- It returns the answer, the tool trace, the tokens and the seconds to `evaluate.py`.
+
+**`AGENTS.md` rules**, each with its reason in the file:
+1. Search before answering, every time.
+2. Answer only from the search results.
+3. Cite every claim with the exact `[source | location]` tag.
+4. When the corpus does not cover the question, reply exactly `The corpus does not cover this question.` A nearby rule may be added only when labelled as context.
+5. Label partial answers.
+6. Add documents only when asked.
+7. Be brief.
+
+The rules start by stating the use case (a compliance analyst, and the cost of a wrong answer), so the model knows why refusing beats guessing.
+
+**Approval step.**
+- `HumanInTheLoopMiddleware` pauses every `add_document` call until a person answers `Allow? [y/N]` at the terminal. A "no" is passed back to the model as a rejected tool call.
+- With no terminal (evaluation, `check.py`), the call is denied automatically, so the evaluation can never change the corpus.
+
+**Call limits.** At most 8 model calls and 5 searches per question.
+
+**Extra guardrail: citation verification.**
+- After the agent answers, code checks that every `[source | location]` tag in the answer was actually returned by `search` in this conversation, and that an answer that is not a refusal cites something.
+- If the check fails, the agent gets one chance to rewrite the answer. If the rewrite still fails, the answer is replaced by the refusal sentence, so no answer with an unverifiable citation ever reaches the analyst.
+
+**A case where it fired.** For "How long must recordings of client telephone conversations be kept?":
+- The first draft cited `[MiFID II | Article 16 (Organisational requirements), p. 50]` and `[MiFID II Delegated Regulation | Article 76 (…), p. 65]`, but search had returned `pp. 49-50` and `pp. 64-65`.
+- The guardrail rejected the shortened tags, and the rewrite used the exact ones.
+- It fired on 19 of the 40 evaluation questions. The rewrite passed in 15; in 4 (q10, q14, q28, q33) it failed again and the answer was withheld. Those 4 are exactly the wrong refusals in *Failures*.
 
 ## Evaluation
 
-*Code checks, the judge's rubric, your agreement with the judge, and results: correct, unsupported, correct refusals, wrong refusals.*
+The agent answered all 40 questions (`eval/answers.jsonl`), with `add_document` always denied. Each answer was then checked in code and graded by an LLM judge, and I graded all 40 myself.
+
+**Code checks** (`evaluate.py`, `eval/results.csv`).
+- *Citations valid:* every `[source | location]` tag in the answer was returned by search. Result: 0 invalid citations in 40 answers; the guardrail makes this hold by construction.
+- *Has a citation:* any answer that is not a refusal cites at least one passage.
+- *Cites the expected article.*
+- *Refusal:* the answer contains the exact refusal sentence. For unanswerable questions, correctness is decided by this check, not by the judge.
+
+**LLM judge.** `gemini-3.1-flash-lite` (temperature 0, JSON output) gets the question, the reference answer, the passages the agent retrieved as evidence, and the agent's answer. It returns `correct`, `supported` and a one-sentence reason (`eval/judge.jsonl`). My rubric:
+```text
+You grade an assistant's answer to a question about EU investment-services
+legislation (MiFID II, its Delegated Regulation, MiFIR, PRIIPs).
+
+CORRECT (0 or 1)
+- correct = 1 when the answer covers every key point of the reference answer.
+  Small details may be missing.
+- If a whole part of a multi-part question is missing, correct = 0.
+- Extra detail is fine as long as it is accurate and does not contradict the
+  reference.
+- Question the corpus cannot answer (the reference says so): correct = 1 only
+  if the answer clearly says the corpus does not cover it ("The corpus does not cover this question."). It may
+  add one cited sentence about what the corpus covers nearby.
+- An answer that presents a related rule as if it were the answer is correct = 0.
+  It is correct = 1 only if it first says the corpus does not cover the question
+  and labels the related rule as context, not as the answer.
+- A refusal to a question the corpus can answer is always correct = 0.
+
+SUPPORTED (0 or 1)
+- supported = 1 when every claim is backed by the evidence passages. A faithful
+  paraphrase is fine; exact wording is not needed.
+- A claim is unsupported when the answer attributes a passage to a different
+  subject, law, authority or date than the passage itself has, even if the
+  words appear in the passage.
+- A claim is unsupported if the passage it cites does not say it, even when a
+  different evidence passage does.
+- A refusal makes no factual claims, so it is supported = 1.
+
+Give a one-sentence reason.
+```
+
+**Agreement with my grades** (`eval/human_labels.csv`, graded from `eval/grading_sheet.md` before I read any verdict):
+
+| | First rubric (draft) | My rubric |
+|---|---|---|
+| correct: agreement (Cohen's κ) | 97.5% (0.93) | 95% (0.86) |
+| supported: agreement (κ) | 95% (0.00) | 95% (0.00) |
+| Disagreements | correct: q29 · supported: q36, q39 | correct: q23, q29 · supported: q36, q39 |
+
+- *Correct:* the judge agrees with me on 38–39 of 40. Where we differ, it accepted partial answers (q29: one of the two authorities found; q23) that my rubric scores 0.
+- *Supported:* κ = 0 because the judge never gave 0, so its 95% agreement is only my base rate. It marked q36 and q39 as supported, though they attribute passages to the wrong authority (EU minimum fines presented as the CNMV's) and the wrong date (a 2017 recital used to describe the 2021 quick fix).
+- My rubric added an explicit rule for exactly this kind of misattribution, with generic examples so the agreement is not measured on cases I described to the judge. The judge still did not apply it: it saw those answers as incorrect (no refusal), but not as unsupported.
+- **Conclusion: this judge can be trusted for "correct" but not for "supported".** "Supported" needs a human or a stronger model.
+
+**Results** (40 questions; my grades, with the judge in brackets):
+
+| Kind | Correct |
+|---|---|
+| single | 23 / 26 (judge 24) |
+| multi | 2 / 7 (judge 3) |
+| unanswerable | 5 / 7 (code check 3) |
+| **Total** | **30 / 40 (judge 30)** |
+
+| Outcome | Count |
+|---|---|
+| Unsupported answers (my grades) | 2 (q36, q39); judge: 0 |
+| Correct refusals (unanswerable, exact sentence) | 3 / 7 (q35, q37, q40) |
+| Unanswerable answered anyway (code check) | 4 / 7 (q34, q36, q38, q39). I graded q34 and q38 as proper refusals in substance: they declined in their own words, without the exact sentence. |
+| Wrong refusals (answerable but refused) | 4 / 33 (q10, q14, q28, q33), all withheld by the citation guardrail |
+
+**Cost.**
+- Agent: mean 5,718 tokens per question (median 4,875, max 13,802), and 3.1 s of model time (max 7.6 s). A full `main.py ask`, including starting the MCP server, takes about 7–25 s.
+- Judge: about 2,700 tokens per answer.
 
 ## Failures
 
-*Failed questions by cause, with counts, and what to fix first.*
+10 of 40 answers failed by my grades. Each is classified from my grading notes and the retrieved passages (`eval/results.csv`, `eval/human_labels.csv`):
+
+| Cause | Count | Questions | What happened |
+|---|---|---|---|
+| Wrong refusal | 4 | q10, q14, q28, q33 | The right passages were retrieved (PRIIPs Art. 7 even at rank 1 for q10), and the agent had a correct answer. But it cited shortened or merged tags, failed the citation check twice, and the guardrail replaced the answer with the refusal. |
+| Retrieval miss | 4 | q23, q29, q31, q32 | One needed article was not retrieved: Delegated Regulation Art. 56 (q23), MiFIR Art. 40 (q29), MiFID II Art. 25(6) (q31), MiFID II Art. 25(4) (q32). Three are multi-passage questions where only one part was found. The agent then answered that part and said the other was not covered: a labelled partial answer, but incomplete. |
+| Unsupported claim | 2 | q36, q39 | Unanswerable questions answered with a passage attributed to the wrong authority or date: PRIIPs' EU minimum fines presented as the CNMV's (q36), and a 2017 recital used to describe the 2021 quick fix (q39). |
+| Wrong answer from the right passage | 0 | | |
+| Bad test question | 0 | | |
+
+Observations:
+- *Where the failures concentrate:* multi-passage questions are the weak spot (2 of 7 correct, against 23 of 26 single-passage questions). Every failure among them is either a retrieval miss on the second part or a guardrail refusal.
+- *What did not happen:* the agent never invented a citation (0 invalid tags), and it never answered wrongly from a passage it had correctly retrieved.
+- *A measurement note:* the code check counted q34 and q38 as unanswerable questions answered anyway. They actually declined in their own words, without the exact refusal sentence, and I graded them as proper refusals. The exact-sentence check is stricter than the behaviour it is meant to measure.
+
+**What to fix first: the citation guardrail.**
+- It caused 4 of the 10 failures, and in all 4 the agent had already retrieved the right passage and written a correct answer. So these are answers the system had and then threw away.
+- The fix is small and does not weaken the guardrail's purpose: accept a citation whose source and article match a retrieved passage and whose page range overlaps it, so `p. 50` for a passage at `pp. 49-50` passes. Alternatively, have the rewrite step insert the exact tags. An invented article or a wrong source would still be rejected.
+- The analyst would then get 4 more correct, cited answers instead of "not covered".
+
+**Second: retrieval for multi-part questions** (3 failures). Search each part of the question separately, or raise k for questions that join two rules. **Third: unanswerable questions near the corpus** (2 failures). Rule 4's context labelling, added after this evaluation, targets exactly q36 and q39, but its effect has not yet been measured.
 
 ## Decision
 
-*Would you let users rely on it, for what, with which safeguard? Cost and latency per question.*
+**Yes, but only for single-rule questions, and the analyst always checks the cited article before acting.**
+
+*What it may be used for:* questions answered by one article, such as "How long must call recordings be kept?", "In what language must the KID be written?" or "When must the KID be handed over?".
+- On these it answered 23 of 26 correctly.
+- Every claim carries a citation to a real retrieved article: 0 invented citations in 40 answers.
+- The analyst opens the cited article and confirms the answer before acting on it or quoting it in the compliance file. The answer saves the search for the right article; it does not replace reading it.
+
+*What it is not used for:*
+- *Questions that combine two rules* (2 of 7 correct). A missing second part is flagged as "not covered" rather than answered, but the analyst cannot rely on the answer being complete.
+- *Questions at the edge of the corpus,* such as national law, later amendments or other regulations. In 2 of 7 unanswerable questions it presented a nearby rule as the answer, with the wrong authority or date. The citation in those answers is real, which is exactly why the analyst must check that the cited article says what the answer claims.
+
+*How to read the answers:*
+- "The corpus does not cover this question" means look elsewhere, not that no rule exists.
+- With the current guardrail, about 1 in 8 answerable questions (4 of 33) wrongly gets that answer. Fixing the guardrail first (see *Failures*) would cut this.
+
+**Cost and latency per question.**
+- Agent: mean 5,718 tokens (median 4,875, max 13,802), on `gemini-3.1-flash-lite` with `gemini-embedding-2` for the query.
+- Time: 3.1 s of model time on average (max 7.6 s). A full `main.py ask`, including starting the MCP server, took about 7–25 s.
+- Evaluation: each judged answer costs about 2,700 more tokens.
+- At these volumes the whole project (indexing about 2,200 chunks, 40 evaluated questions, re-judging and the demo) cost a few cents of API credit.
 
 ## AI use
 
-*What you used and how, or "none".*
+I used Claude Code (Anthropic) and an AI assistant throughout, as follows.
+
+**Code (Claude Code).**
+- It wrote `index.py`, `server.py`, `agent.py` and `evaluate.py`, and fixed the bugs found along the way: PDF heading detection, batch embedding with `gemini-embedding-2`, passing the API key to the MCP server, and the retrieval comparison skewed by the demo document.
+- It ran the indexing, the retrieval comparison, the agent evaluation and the judge, and it set up the cloud environment and the pull requests.
+
+**Drafts that I then decided on.**
+- Claude Code drafted `AGENTS.md`, the judge rubric and the subagent instructions.
+- I set the reasons for each rule from my use case, wrote the rubric's rules (what counts as correct, partial and supported), chose generic rubric examples so the agreement is not measured on cases described to the judge, and decided the subagent changes.
+
+**Test set.** AI provided summaries of the articles. The questions were drafted and later checked with AI for compliance with the assignment. I checked every reference answer and article number against the text.
+
+**This report.** Claude Code wrote the factual parts from the evaluation files (tables, counts, cost) and wrote down my answers for the analysis sections. I wrote the use case.
+
+**Mine.**
+- The use case and the choice of documents.
+- Choosing the design by the numbers.
+- All 40 grades in `eval/human_labels.csv`, graded before I read the judge's verdicts.
+- The failure classification, what to fix first, and the decision on whether and how users may rely on the system.
