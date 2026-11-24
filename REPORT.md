@@ -444,7 +444,27 @@ Give a one-sentence reason.
 
 ## Failures
 
-*Failed questions by cause, with counts, and what to fix first.*
+10 of 40 answers failed by my grades. Each is classified from my grading notes and the retrieved passages (`eval/results.csv`, `eval/human_labels.csv`):
+
+| Cause | Count | Questions | What happened |
+|---|---|---|---|
+| Wrong refusal | 4 | q10, q14, q28, q33 | The right passages were retrieved (PRIIPs Art. 7 even at rank 1 for q10), and the agent had a correct answer. But it cited shortened or merged tags, failed the citation check twice, and the guardrail replaced the answer with the refusal. |
+| Retrieval miss | 4 | q23, q29, q31, q32 | One needed article was not retrieved: Delegated Regulation Art. 56 (q23), MiFIR Art. 40 (q29), MiFID II Art. 25(6) (q31), MiFID II Art. 25(4) (q32). Three are multi-passage questions where only one part was found. The agent then answered that part and said the other was not covered: a labelled partial answer, but incomplete. |
+| Unsupported claim | 2 | q36, q39 | Unanswerable questions answered with a passage attributed to the wrong authority or date: PRIIPs' EU minimum fines presented as the CNMV's (q36), and a 2017 recital used to describe the 2021 quick fix (q39). |
+| Wrong answer from the right passage | 0 | | |
+| Bad test question | 0 | | |
+
+Observations:
+- *Where the failures concentrate:* multi-passage questions are the weak spot (2 of 7 correct, against 23 of 26 single-passage questions). Every failure among them is either a retrieval miss on the second part or a guardrail refusal.
+- *What did not happen:* the agent never invented a citation (0 invalid tags), and it never answered wrongly from a passage it had correctly retrieved.
+- *A measurement note:* the code check counted q34 and q38 as unanswerable questions answered anyway. They actually declined in their own words, without the exact refusal sentence, and I graded them as proper refusals. The exact-sentence check is stricter than the behaviour it is meant to measure.
+
+**What to fix first: the citation guardrail.**
+- It caused 4 of the 10 failures, and in all 4 the agent had already retrieved the right passage and written a correct answer. So these are answers the system had and then threw away.
+- The fix is small and does not weaken the guardrail's purpose: accept a citation whose source and article match a retrieved passage and whose page range overlaps it, so `p. 50` for a passage at `pp. 49-50` passes. Alternatively, have the rewrite step insert the exact tags. An invented article or a wrong source would still be rejected.
+- The analyst would then get 4 more correct, cited answers instead of "not covered".
+
+**Second: retrieval for multi-part questions** (3 failures). Search each part of the question separately, or raise k for questions that join two rules. **Third: unanswerable questions near the corpus** (2 failures). Rule 4's context labelling, added after this evaluation, targets exactly q36 and q39, but its effect has not yet been measured.
 
 ## Decision
 
