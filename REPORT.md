@@ -485,7 +485,7 @@ Observations:
 - Agent: mean 5,718 tokens (median 4,875, max 13,802), on `gemini-3.1-flash-lite` with `gemini-embedding-2` for the query.
 - Time: 3.1 s of model time on average (max 7.6 s). A full `main.py ask`, including starting the MCP server, took about 7–25 s.
 - Evaluation: each judged answer costs about 2,700 more tokens.
-- At these volumes the whole project (indexing about 2,200 chunks, 40 evaluated questions, re-judging and the demo) cost a few cents of API credit.
+- At these volumes the whole project (indexing about 2,200 chunks, 40 evaluated questions, re-judging and the demo) cost a few cents of API credit out of a 5 euros I had to pay out of my own pocket.
 
 ## AI use
 
