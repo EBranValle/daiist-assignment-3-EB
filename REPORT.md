@@ -10,7 +10,19 @@
 
 ## Corpus
 
-*Table: document, URL, date, licence, words.*
+Four EU legal acts on investment services and retail investment products, in English, from EUR-Lex. All are under the EUR-Lex reuse policy (Commission Decision 2011/833/EU: reuse authorised, with acknowledgement of the source), and none contains personal data. The PDFs are committed in `corpus/`, because EUR-Lex blocks scripted downloads with a bot challenge.
+
+| Document (source name) | URL | Date | Licence | Pages | Words |
+|---|---|---|---|---|---|
+| Directive 2014/65/EU, MiFID II (`MiFID II`) | https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014L0065 | 15 May 2014 | EUR-Lex reuse (Decision 2011/833/EU) | 148 | 75,950 |
+| Regulation (EU) No 600/2014, MiFIR (`MiFIR`) | https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014R0600 | 15 May 2014 | EUR-Lex reuse (Decision 2011/833/EU) | 65 | 36,478 |
+| Delegated Regulation (EU) 2017/565 (`MiFID II Delegated Regulation`) | https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32017R0565 | 25 April 2016 | EUR-Lex reuse (Decision 2011/833/EU) | 83 | 47,080 |
+| Regulation (EU) No 1286/2014, PRIIPs (`PRIIPs`) | https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32014R1286 | 26 November 2014 | EUR-Lex reuse (Decision 2011/833/EU) | 23 | 13,891 |
+| **Total** | | | | **319** | **173,399** |
+
+The word counts are after cleaning (headers, footers and page numbers removed). Each act is the original text as published in the Official Journal, not a consolidated version, so later amendments (for example the 2021 MiFID II "quick fix") are not in the corpus.
+
+Held back for the add-document demo (see *Adding a document*): Delegated Regulation (EU) 2017/653, the PRIIPs regulatory technical standards (`PRIIPs RTS`), https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32017R0653, 8 March 2017, same licence.
 
 ## Ingestion
 
