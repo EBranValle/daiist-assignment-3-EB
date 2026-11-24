@@ -73,9 +73,8 @@ The add-document demo later added 92 `sections` chunks for the PRIIPs RTS.
 ## Test set
 
 **How it was written.**
-- I started from summaries of the articles provided by AI in the four PDFs (KID rules, suitability, best execution, reporting deadlines) and asked what a compliance analyst would need to check before advising or selling to a retail client.
-- The questions were drafted and later checked with AI for assigment complience. I checked every reference answer and article number against the text.
-- The questions are phrased as the analyst would ask them ("Can we…", "When must we…").
+- Since the documents where very large I started from reading summaries of the articles provided by AI in the four PDFs (KID rules, suitability, best execution, reporting deadlines) and asked what a compliance analyst would need to check before advising or selling to a retail client.
+- The questions were drafted and later checked with AI for assignment compliance and model coherence. 
 
 **Unanswerable questions.** I chose topics just outside the corpus, so they are close to its subject, not obviously off-topic:
 - *Mentioned but not detailed in the corpus:* the summary risk indicator (q34) and the performance scenarios (q35), which PRIIPs leaves to the technical standards; and the CFD leverage limits (q38), where MiFIR only gives ESMA the power to intervene.
