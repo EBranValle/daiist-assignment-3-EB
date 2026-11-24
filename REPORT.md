@@ -26,7 +26,50 @@ Held back for the add-document demo (see *Adding a document*): Delegated Regulat
 
 ## Ingestion
 
-*How you extract, clean and chunk; one extraction problem you fixed; chunk metadata; number of chunks.*
+**Extract and clean** (`index.py`).
+- pypdf extracts the text page by page.
+- Cleaning normalises Unicode (NFKC), removes soft hyphens, re-joins words hyphenated across lines and collapses whitespace.
+- It drops page numbers, running headers and footers (lines that repeat at the top or bottom of 30%+ of pages), and the Official Journal header line wherever pypdf places it.
+
+**Structure.**
+- A new section starts at every line that is exactly `Article N` or `ANNEX …`.
+- When a document gives its articles titles, the title on the next line is added to the location, e.g. `Article 25 (Assessment of suitability and appropriateness and reporting to clients)`. PRIIPs has no article titles; this is detected per document.
+- Text before Article 1 is labelled `Recitals`.
+
+**Chunking: two designs** (see *Retrieval*).
+- `sections`: one chunk per article. Articles longer than 350 words are split on sentence boundaries. The embedded text is prefixed with `source - heading`, so each chunk carries the article it belongs to.
+- `words150`: fixed windows of 150 words with a 30-word overlap, ignoring structure, with no prefix.
+
+**Chunk metadata.**
+- `source`: the document name, as used in citations.
+- `location`: the article with its title and page range, e.g. `Article 16 (Organisational requirements), pp. 49-50`. A `words150` window that crosses two articles is labelled `Article 3 to Article 4`.
+- Chunk number and word count.
+- Documents added with `add_document` also store their file's SHA-256 and path.
+- Search results show the citation tag `[source | location]`.
+
+**Embedding and storage.**
+- Chunks are embedded with `gemini-embedding-2` at 768 dimensions, normalised to unit length, as `RETRIEVAL_DOCUMENT`; questions are embedded as `RETRIEVAL_QUERY`.
+- Vectors are written to ChromaDB (cosine distance) in `index/` after every batch of 50. A rerun embeds only chunks without a saved vector, and query vectors are cached in `index/query_vectors.json`.
+- `index/` is 34 MB.
+
+**Number of chunks.**
+
+| Document | `sections` | `words150` |
+|---|---|---|
+| MiFID II | 291 | 633 |
+| MiFIR | 145 | 304 |
+| MiFID II Delegated Regulation | 191 | 393 |
+| PRIIPs | 65 | 116 |
+| **Total** | **692** (mean 251 words) | **1,446** (mean 149 words) |
+
+The add-document demo later added 92 `sections` chunks for the PRIIPs RTS.
+
+**Extraction problem fixed: false article headings.**
+- *The problem.* The first heading pattern accepted any line starting with "Article N" or a number followed by text. Numbered paragraphs ("1. This Regulation establishes uniform requirements…") and cross-references at the start of a line ("Article 114 of the Treaty on the Functioning of the European Union…", "Article 4(1)(52) of Directive 2014/65/EU;") became new sections, and so did the Official Journal header ("31.3.2017 L 87/1 …").
+- *The size of it.* MiFIR has 55 articles but produced 109 headings; the Delegated Regulation produced 240 headings for 91 articles.
+- *Why it matters.* The location of every chunk after a false heading was wrong, so citations would have pointed to a paragraph or a cross-referenced act instead of the real article.
+- *The fix.* A heading must be a line that is exactly `Article N` (optionally with a letter, e.g. `Article 4a`) or `ANNEX …`.
+- *The result.* MiFIR now has 56 sections (55 articles plus Recitals) and the Delegated Regulation 96 (91 articles plus annexes and recitals). Every article in MiFIR, MiFID II and the Delegated Regulation now carries its title.
 
 ## Test set
 
