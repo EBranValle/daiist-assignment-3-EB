@@ -468,7 +468,26 @@ Observations:
 
 ## Decision
 
-*Would you let users rely on it, for what, with which safeguard? Cost and latency per question.*
+**Yes, but only for single-rule questions, and the analyst always checks the cited article before acting.**
+
+*What it may be used for:* questions answered by one article, such as "How long must call recordings be kept?", "In what language must the KID be written?" or "When must the KID be handed over?".
+- On these it answered 23 of 26 correctly.
+- Every claim carries a citation to a real retrieved article: 0 invented citations in 40 answers.
+- The analyst opens the cited article and confirms the answer before acting on it or quoting it in the compliance file. The answer saves the search for the right article; it does not replace reading it.
+
+*What it is not used for:*
+- *Questions that combine two rules* (2 of 7 correct). A missing second part is flagged as "not covered" rather than answered, but the analyst cannot rely on the answer being complete.
+- *Questions at the edge of the corpus,* such as national law, later amendments or other regulations. In 2 of 7 unanswerable questions it presented a nearby rule as the answer, with the wrong authority or date. The citation in those answers is real, which is exactly why the analyst must check that the cited article says what the answer claims.
+
+*How to read the answers:*
+- "The corpus does not cover this question" means look elsewhere, not that no rule exists.
+- With the current guardrail, about 1 in 8 answerable questions (4 of 33) wrongly gets that answer. Fixing the guardrail first (see *Failures*) would cut this.
+
+**Cost and latency per question.**
+- Agent: mean 5,718 tokens (median 4,875, max 13,802), on `gemini-3.1-flash-lite` with `gemini-embedding-2` for the query.
+- Time: 3.1 s of model time on average (max 7.6 s). A full `main.py ask`, including starting the MCP server, took about 7–25 s.
+- Evaluation: each judged answer costs about 2,700 more tokens.
+- At these volumes the whole project (indexing about 2,200 chunks, 40 evaluated questions, re-judging and the demo) cost a few cents of API credit.
 
 ## AI use
 
