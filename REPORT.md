@@ -369,7 +369,78 @@ The rules start by stating the use case (a compliance analyst, and the cost of a
 
 ## Evaluation
 
-*Code checks, the judge's rubric, your agreement with the judge, and results: correct, unsupported, correct refusals, wrong refusals.*
+The agent answered all 40 questions (`eval/answers.jsonl`), with `add_document` always denied. Each answer was then checked in code and graded by an LLM judge, and I graded all 40 myself.
+
+**Code checks** (`evaluate.py`, `eval/results.csv`).
+- *Citations valid:* every `[source | location]` tag in the answer was returned by search. Result: 0 invalid citations in 40 answers; the guardrail makes this hold by construction.
+- *Has a citation:* any answer that is not a refusal cites at least one passage.
+- *Cites the expected article.*
+- *Refusal:* the answer contains the exact refusal sentence. For unanswerable questions, correctness is decided by this check, not by the judge.
+
+**LLM judge.** `gemini-3.1-flash-lite` (temperature 0, JSON output) gets the question, the reference answer, the passages the agent retrieved as evidence, and the agent's answer. It returns `correct`, `supported` and a one-sentence reason (`eval/judge.jsonl`). My rubric:
+```text
+You grade an assistant's answer to a question about EU investment-services
+legislation (MiFID II, its Delegated Regulation, MiFIR, PRIIPs).
+
+CORRECT (0 or 1)
+- correct = 1 when the answer covers every key point of the reference answer.
+  Small details may be missing.
+- If a whole part of a multi-part question is missing, correct = 0.
+- Extra detail is fine as long as it is accurate and does not contradict the
+  reference.
+- Question the corpus cannot answer (the reference says so): correct = 1 only
+  if the answer clearly says the corpus does not cover it ("The corpus does not cover this question."). It may
+  add one cited sentence about what the corpus covers nearby.
+- An answer that presents a related rule as if it were the answer is correct = 0.
+  It is correct = 1 only if it first says the corpus does not cover the question
+  and labels the related rule as context, not as the answer.
+- A refusal to a question the corpus can answer is always correct = 0.
+
+SUPPORTED (0 or 1)
+- supported = 1 when every claim is backed by the evidence passages. A faithful
+  paraphrase is fine; exact wording is not needed.
+- A claim is unsupported when the answer attributes a passage to a different
+  subject, law, authority or date than the passage itself has, even if the
+  words appear in the passage.
+- A claim is unsupported if the passage it cites does not say it, even when a
+  different evidence passage does.
+- A refusal makes no factual claims, so it is supported = 1.
+
+Give a one-sentence reason.
+```
+
+**Agreement with my grades** (`eval/human_labels.csv`, graded from `eval/grading_sheet.md` before I read any verdict):
+
+| | First rubric (draft) | My rubric |
+|---|---|---|
+| correct: agreement (Cohen's κ) | 97.5% (0.93) | 95% (0.86) |
+| supported: agreement (κ) | 95% (0.00) | 95% (0.00) |
+| Disagreements | correct: q29 · supported: q36, q39 | correct: q23, q29 · supported: q36, q39 |
+
+- *Correct:* the judge agrees with me on 38–39 of 40. Where we differ, it accepted partial answers (q29: one of the two authorities found; q23) that my rubric scores 0.
+- *Supported:* κ = 0 because the judge never gave 0, so its 95% agreement is only my base rate. It marked q36 and q39 as supported, though they attribute passages to the wrong authority (EU minimum fines presented as the CNMV's) and the wrong date (a 2017 recital used to describe the 2021 quick fix).
+- My rubric added an explicit rule for exactly this kind of misattribution, with generic examples so the agreement is not measured on cases I described to the judge. The judge still did not apply it: it saw those answers as incorrect (no refusal), but not as unsupported.
+- **Conclusion: this judge can be trusted for "correct" but not for "supported".** "Supported" needs a human or a stronger model.
+
+**Results** (40 questions; my grades, with the judge in brackets):
+
+| Kind | Correct |
+|---|---|
+| single | 23 / 26 (judge 24) |
+| multi | 2 / 7 (judge 3) |
+| unanswerable | 5 / 7 (code check 3) |
+| **Total** | **30 / 40 (judge 30)** |
+
+| Outcome | Count |
+|---|---|
+| Unsupported answers (my grades) | 2 (q36, q39); judge: 0 |
+| Correct refusals (unanswerable, exact sentence) | 3 / 7 (q35, q37, q40) |
+| Unanswerable answered anyway (code check) | 4 / 7 (q34, q36, q38, q39). I graded q34 and q38 as proper refusals in substance: they declined in their own words, without the exact sentence. |
+| Wrong refusals (answerable but refused) | 4 / 33 (q10, q14, q28, q33), all withheld by the citation guardrail |
+
+**Cost.**
+- Agent: mean 5,718 tokens per question (median 4,875, max 13,802), and 3.1 s of model time (max 7.6 s). A full `main.py ask`, including starting the MCP server, takes about 7–25 s.
+- Judge: about 2,700 tokens per answer.
 
 ## Failures
 
